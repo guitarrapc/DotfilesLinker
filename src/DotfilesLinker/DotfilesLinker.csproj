@@ -11,15 +11,14 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
     <WarningsAsErrors>$(WarningsAsErrors);Nullable</WarningsAsErrors>
   </PropertyGroup>
-  
+
   <PropertyGroup>
     <PublishAot>true</PublishAot>
     <SelfContained>true</SelfContained>
-    <StripSymbols>false</StripSymbols>
+    <StripSymbols>true</StripSymbols>
     <TrimMode>full</TrimMode>
   </PropertyGroup>
 
