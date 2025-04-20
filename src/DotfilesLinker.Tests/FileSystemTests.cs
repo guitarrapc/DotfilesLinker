@@ -100,6 +100,49 @@ public class FileSystemTests
     }
 
     [Fact]
+    public void CreateDirectorySymlink_ShouldThrowException_WhenPathsAreInvalid()
+    {
+        // Arrange
+        string invalidLinkPath = "";
+        string invalidTargetPath = "";
+
+        // Configure the mock
+        _fileSystemMock
+            .When(fs => fs.CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(call =>
+            {
+                var linkPath = call.ArgAt<string>(0);
+                var targetPath = call.ArgAt<string>(1);
+
+                if (string.IsNullOrWhiteSpace(linkPath) || string.IsNullOrWhiteSpace(targetPath))
+                {
+                    throw new ArgumentException("Invalid path(s) provided.");
+                }
+            });
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() =>
+            _fileSystemMock.CreateDirectorySymlink(invalidLinkPath, invalidTargetPath));
+    }
+
+    [Fact]
+    public void EnumerateFiles_ShouldHandleComplexPattern()
+    {
+        // Arrange
+        var root = "root";
+        var pattern = "[a-c]*.txt"; // 複雑なパターン
+        var recursive = true;
+        var expectedFiles = new List<string> { "root/a.txt", "root/b123.txt", "root/c.txt" };
+        _fileSystemMock.EnumerateFiles(root, pattern, recursive).Returns(expectedFiles);
+
+        // Act
+        var result = _fileSystemMock.EnumerateFiles(root, pattern, recursive);
+
+        // Assert
+        Assert.Equal(expectedFiles, result);
+    }
+
+    [Fact]
     public void EnsureDirectory_ShouldInvokeEnsureDirectoryMethod()
     {
         // Arrange
@@ -110,5 +153,118 @@ public class FileSystemTests
 
         // Assert
         _fileSystemMock.Received(1).EnsureDirectory(directoryPath);
+    }
+
+    [Fact]
+    public void FileExists_ShouldReturnFalse_WhenPathIsInvalid()
+    {
+        // Arrange
+        string invalidPath = "";
+
+        // Act
+        var result = _fileSystemMock.FileExists(invalidPath);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void DirectoryExists_ShouldReturnFalse_WhenPathIsInvalid()
+    {
+        // Arrange
+        string invalidPath = "";
+
+        // Act
+        var result = _fileSystemMock.DirectoryExists(invalidPath);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void GetLinkTarget_ShouldReturnNull_WhenPathIsNotSymlink()
+    {
+        // Arrange
+        string nonSymlinkPath = "regularFile.txt";
+        _fileSystemMock.GetLinkTarget(nonSymlinkPath).Returns((string?)null);
+
+        // Act
+        var result = _fileSystemMock.GetLinkTarget(nonSymlinkPath);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Delete_ShouldNotThrow_WhenPathDoesNotExist()
+    {
+        // Arrange
+        string nonexistentPath = "nonexistentFile.txt";
+
+        // Act & Assert
+        var exception = Record.Exception(() => _fileSystemMock.Delete(nonexistentPath));
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void CreateFileSymlink_ShouldThrowException_WhenPathsAreInvalid()
+    {
+        // Arrange
+        string invalidLinkPath = "";
+        string invalidTargetPath = ""; // if null is specified, exception is thrown without mock
+
+        // Configure the mock to throw an exception for invalid arguments
+        _fileSystemMock
+            .When(fs => fs.CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(call =>
+            {
+                var linkPath = call.ArgAt<string>(0);
+                var targetPath = call.ArgAt<string>(1);
+
+                if (string.IsNullOrWhiteSpace(linkPath) || string.IsNullOrWhiteSpace(targetPath))
+                {
+                    throw new ArgumentException("Invalid path(s) provided.");
+                }
+            });
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _fileSystemMock.CreateFileSymlink(invalidLinkPath, invalidTargetPath));
+    }
+
+    [Fact]
+    public void EnumerateFiles_ShouldReturnEmpty_WhenRootPathIsInvalid()
+    {
+        // Arrange
+        string invalidRoot = "";
+        _fileSystemMock.EnumerateFiles(invalidRoot, "*.txt", true).Returns(Enumerable.Empty<string>());
+
+        // Act
+        var result = _fileSystemMock.EnumerateFiles(invalidRoot, "*.txt", true);
+
+        // Assert
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void EnsureDirectory_ShouldThrowException_WhenPathIsInvalid()
+    {
+        // Arrange
+        string invalidPath = ""; // if null is specified, exception is thrown without mock
+
+        // Configure the mock to throw an exception for invalid arguments
+        _fileSystemMock
+            .When(fs => fs.EnsureDirectory(Arg.Any<string>()))
+            .Do(call =>
+            {
+                var path = call.ArgAt<string>(0);
+
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    throw new ArgumentException("Invalid path provided.");
+                }
+            });
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() => _fileSystemMock.EnsureDirectory(invalidPath));
     }
 }
