@@ -20,6 +20,9 @@
     <SelfContained>true</SelfContained>
     <StripSymbols>true</StripSymbols>
     <TrimMode>full</TrimMode>
+
+    <IlcOptimizationPreference>Speed</IlcOptimizationPreference>
+    <IlcFoldIdenticalMethodBodies>true</IlcFoldIdenticalMethodBodies>
   </PropertyGroup>
 
 </Project>
