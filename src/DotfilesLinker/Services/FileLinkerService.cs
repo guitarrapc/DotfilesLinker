@@ -3,12 +3,8 @@ using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Services;
 
-public sealed class FileLinkerService
+public sealed class FileLinkerService(IFileSystem fileSystem)
 {
-    private readonly IFileSystem _fs;
-
-    public FileLinkerService(IFileSystem fileSystem) => _fs = fileSystem;
-
     /*-----------------------------------------------------------
      * public APIs
      *----------------------------------------------------------*/
@@ -25,7 +21,7 @@ public sealed class FileLinkerService
     {
         var ignore = LoadIgnoreList(Path.Combine(repoRoot, ignoreFileName));
 
-        foreach (var src in _fs.EnumerateFiles(repoRoot, ".*", recursive: false)
+        foreach (var src in fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false)
                                .Where(p => !ignore.Contains(Path.GetFileName(p))))
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
@@ -43,14 +39,14 @@ public sealed class FileLinkerService
         bool overwrite)
     {
         var homeRoot = Path.Combine(repoRoot, "home");
-        if (!_fs.DirectoryExists(homeRoot)) return;
+        if (!fileSystem.DirectoryExists(homeRoot)) return;
 
-        foreach (var src in _fs.EnumerateFiles(homeRoot, "*", recursive: true))
+        foreach (var src in fileSystem.EnumerateFiles(homeRoot, "*", recursive: true))
         {
             var rel = Path.GetRelativePath(homeRoot, src);
             var dst = Path.Combine(userHome, rel);
 
-            _fs.EnsureDirectory(Path.GetDirectoryName(dst)!);
+            fileSystem.EnsureDirectory(Path.GetDirectoryName(dst)!);
             LinkFile(src, dst, overwrite);
         }
     }
@@ -61,11 +57,11 @@ public sealed class FileLinkerService
 
     private void LinkFile(string source, string target, bool overwrite)
     {
-        bool exists = _fs.FileExists(target) || _fs.DirectoryExists(target);
+        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
 
         if (exists)
         {
-            var currentLinkTarget = _fs.GetLinkTarget(target);
+            var currentLinkTarget = fileSystem.GetLinkTarget(target);
 
             // 既に正しいリンクが張られているなら何もしない
             if (currentLinkTarget is not null && PathUtilities.PathEquals(currentLinkTarget, source))
@@ -74,17 +70,17 @@ public sealed class FileLinkerService
             if (!overwrite)
                 throw new InvalidOperationException($"'{target}' already exists; use --force=y to overwrite.");
 
-            _fs.Delete(target);
+            fileSystem.Delete(target);
         }
 
         // ディレクトリ or ファイルで API を分ける
-        if (_fs.DirectoryExists(source))
+        if (fileSystem.DirectoryExists(source))
         {
-            _fs.CreateDirectorySymlink(target, source);
+            fileSystem.CreateDirectorySymlink(target, source);
         }
         else
         {
-            _fs.CreateFileSymlink(target, source);
+            fileSystem.CreateFileSymlink(target, source);
         }
     }
 
