@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  build:
+  build-test:
     strategy:
       fail-fast: false
       matrix:
@@ -45,3 +45,13 @@ jobs:
       - name: Publish
         run: dotnet publish -c Release -r ${{ matrix.rid }} -p:EnableAot=true
         working-directory: ./src/DotfilesLinker
+
+  # marker job to target PR status check
+  build:
+    needs: build-test
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    steps:
+      - name: result
+        run: exit 0
