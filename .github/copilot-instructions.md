@@ -1,3 +1,5 @@
 - チャットのやり取りは日本語で行います。
 - コードは公開するため、コード中のコメントは英語ベースにします。
 - C#はTargetFrameworkで利用できる最新の記法を用います。
+- C#のコードはdotnet formatでフォーマットします。
+- GitHub Actionsは、actionlintやghalintを用いてLintを行います。

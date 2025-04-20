@@ -10,8 +10,9 @@
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'EnableAOT' == 'true'">
+  <PropertyGroup Condition="'EnableAot' == 'true'">
     <PublishAot>true</PublishAot>
+    <SelfContained>true</SelfContained>
   </PropertyGroup>
 
 </Project>
