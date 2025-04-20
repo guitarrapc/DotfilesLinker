@@ -97,7 +97,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           # Create checksums file
-          CHECKSUM_FILE="./artifacts/DotfilesLinker_${TAG}_checksums.txt"
+          CHECKSUM_FILE="./DotfilesLinker_${TAG}_checksums.txt"
 
           # Calculate SHA256 checksums for all artifacts
           cd ./artifacts
