@@ -58,7 +58,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         var files = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false)
             .Where(p => !ignore.Contains(Path.GetFileName(p)));
 
-        _logger.Info($"Linking {files.Count()} files from repository root to home directory");
+        _logger.Info($"Found {files.Count()} files to link from repository root directory to {userHome}");
 
         foreach (var src in files)
         {
@@ -112,7 +112,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         _logger.Info($"Processing {srcDir} directory: {srcPath}");
         var files = fileSystem.EnumerateFiles(srcPath, "*", recursive: true).ToList();
-        _logger.Info($"Found {files.Count} files to link from {srcDir} directory");
+        _logger.Info($"Found {files.Count} files to link from {srcDir} directory to {destDir}");
 
         foreach (var file in files)
         {
