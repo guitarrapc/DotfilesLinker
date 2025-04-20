@@ -3,6 +3,11 @@
 Link dotfiles from a repository to your home/root directory.
 Depends on your dotfiles repository structure, DotfilesLinker will link your dotfiles.
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Quick Start
 
 1. Download the latest binary from the [GitHub Releases page](https://github.com/guitarrapc/DotfilesLinker/releases/latest) and place it in a directory that is in your PATH.
