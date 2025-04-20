@@ -54,7 +54,7 @@ jobs:
         shell: bash
         run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
       - name: Create archive (Windows)
-        if: ${{ runner.os != 'Windows' }}
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: Compress-Archive -Path ./publish/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
@@ -85,6 +85,26 @@ jobs:
         run: |
           echo "Downloaded artifacts:"
           find ./artifacts -type f | sort
+
+          # Ensure we have artifacts to release
+          if [ -z "$(find ./artifacts -type f)" ]; then
+            echo "::error::No artifacts found. Aborting release creation."
+            exit 1
+          fi
+      - name: Generate checksums and signature
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Create checksums file
+          CHECKSUM_FILE="./artifacts/DotfilesLinker_${TAG}_checksums.txt"
+
+          # Calculate SHA256 checksums for all artifacts
+          cd ./artifacts
+          sha256sum * > "${CHECKSUM_FILE}"
+
+          echo "Generated checksums file:"
+          cat "${CHECKSUM_FILE}"
       - name: Create GitHub Release via gh
         shell: bash
         env:
@@ -92,11 +112,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          # Ensure we have artifacts to release
-          if [ -z "$(find ./artifacts -type f)" ]; then
-            echo "::error::No artifacts found. Aborting release creation."
-            exit 1
-          fi
-
           # Create release with all artifacts
           gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits ./artifacts/*
