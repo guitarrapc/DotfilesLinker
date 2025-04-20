@@ -33,9 +33,11 @@ public sealed class DefaultFileSystem : IFileSystem
 
     /// <inheritdoc/>
     public IEnumerable<string> EnumerateFiles(string root, string pattern, bool recursive) =>
-        Directory.EnumerateFiles(root, pattern,
-            recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
+        Directory.EnumerateFiles(root, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
     /// <inheritdoc/>
     public void EnsureDirectory(string p) => Directory.CreateDirectory(p);
+
+    /// <inheritdoc/>
+    public string[] ReadAllLines(string path) => File.ReadAllLines(path);
 }

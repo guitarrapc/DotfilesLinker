@@ -52,7 +52,9 @@ jobs:
           dotnet-version: 9.0.x
       - name: dotnet publish (Native AOT)
         shell: bash
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
+        env:
+          TAG: ${{ github.ref_name }}
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version=${TAG} --artifacts-path ./artifacts
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh

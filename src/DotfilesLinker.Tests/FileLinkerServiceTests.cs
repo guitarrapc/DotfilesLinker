@@ -54,34 +54,21 @@ public class FileLinkerServiceTests
         // Mock file system behavior
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(filesInRepo);
         _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);
-        _fileSystemMock.DirectoryExists(repoRoot).Returns(true);
 
-        // Create a temporary ignore file in the system's temp directory
         string ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
-        Directory.CreateDirectory(repoRoot); // Ensure the directory exists
-        File.WriteAllLines(ignoreFilePath, ignoredFiles);
 
-        try
-        {
-            // Act
-            _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite);
+        // Mock ignore file existance check
+        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
 
-            // Assert
-            _fileSystemMock.Received(1).CreateFileSymlink(Path.Combine(userHome, ".file1"), "/repo/.file1");
-            _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, ".file2"), "/repo/.file2");
-        }
-        finally
-        {
-            // Cleanup
-            if (File.Exists(ignoreFilePath))
-            {
-                File.Delete(ignoreFilePath);
-            }
-            if (Directory.Exists(repoRoot))
-            {
-                Directory.Delete(repoRoot, recursive: true);
-            }
-        }
+        // Mock ReadAllLines
+        _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(ignoredFiles);
+
+        // Act
+        _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite);
+
+        // Assert
+        _fileSystemMock.Received(1).CreateFileSymlink(Path.Combine(userHome, ".file1"), "/repo/.file1");
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, ".file2"), "/repo/.file2");
     }
 
     [Fact]

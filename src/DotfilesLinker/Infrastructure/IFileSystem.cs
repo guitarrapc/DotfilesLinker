@@ -60,4 +60,14 @@ public interface IFileSystem
     /// </summary>
     /// <param name="path">The directory path to create.</param>
     void EnsureDirectory(string path);
+
+    /// <summary>
+    /// Reads all lines from the specified file.
+    /// </summary>
+    /// <param name="path">The path to the file to read.</param>
+    /// <returns>An array containing all lines of the file.</returns>
+    /// <exception cref="System.IO.FileNotFoundException">The file is not found.</exception>
+    /// <exception cref="System.IO.DirectoryNotFoundException">The directory is not found.</exception>
+    /// <exception cref="System.IO.IOException">An I/O error occurred.</exception>
+    string[] ReadAllLines(string path);
 }
