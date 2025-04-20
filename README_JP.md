@@ -1,7 +1,23 @@
+[![Build](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml)
+[![Release](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml)
+
 # DotfilesLinker
 
 Dotfilesリポジトリからホームディレクトリやルートディレクトリへのシンボリックリンクを作成します。
 dotfilesリポジトリの構造に基づいて、自動的にファイルをリンクします。
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+# Table of Contents
+
+- [インストール方法](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E6%96%B9%E6%B3%95)
+- [使い方](#%E4%BD%BF%E3%81%84%E6%96%B9)
+- [コマンドオプション](#%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89%E3%82%AA%E3%83%97%E3%82%B7%E3%83%A7%E3%83%B3)
+- [環境変数](#%E7%92%B0%E5%A2%83%E5%A4%89%E6%95%B0)
+- [動作原理](#%E5%8B%95%E4%BD%9C%E5%8E%9F%E7%90%86)
+- [設定](#%E8%A8%AD%E5%AE%9A)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 ## インストール方法
 

@@ -54,7 +54,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
-        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version=${TAG} --artifacts-path ./artifacts
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version="${TAG}" --artifacts-path ./artifacts
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
