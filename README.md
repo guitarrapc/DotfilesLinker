@@ -1,10 +1,11 @@
 [![Build](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml)
 [![Release](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml)
 
+[日本語](README_ja.md)
+
 # DotfilesLinker
 
-Link dotfiles from a repository to your home/root directory.
-Depends on your dotfiles repository structure, DotfilesLinker will link your dotfiles.
+Fast C# Native AOT utility to create symbolic links from dotfiles to your home directory
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->

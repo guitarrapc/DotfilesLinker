@@ -1,10 +1,11 @@
 [![Build](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/build.yaml)
 [![Release](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml/badge.svg?event=push)](https://github.com/guitarrapc/DotfilesLinker/actions/workflows/release.yaml)
 
+[English](README.md)
+
 # DotfilesLinker
 
-Dotfilesリポジトリからホームディレクトリやルートディレクトリへのシンボリックリンクを作成します。
-dotfilesリポジトリの構造に基づいて、自動的にファイルをリンクします。
+C# Native AOTで実装された高速な dotfiles シンボリックリンク作成ツール。WindowsやLinux、macOSに対応し、dotfilesリポジトリの構造を尊重します。
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
