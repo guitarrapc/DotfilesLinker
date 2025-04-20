@@ -1,15 +1,22 @@
 ﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
+using System.Reflection;
 
 // parse args
 bool showHelp = args.Any(a => a.Equals("--help", StringComparison.OrdinalIgnoreCase) || a.Equals("-h", StringComparison.OrdinalIgnoreCase));
+bool showVersion = args.Any(a => a.Equals("--version", StringComparison.OrdinalIgnoreCase));
 bool forceOverwrite = args.Any(a => a.Equals("--force=y", StringComparison.OrdinalIgnoreCase));
 bool verbose = args.Any(a => a.Equals("--verbose", StringComparison.OrdinalIgnoreCase) || a.Equals("-v", StringComparison.OrdinalIgnoreCase));
 
-// display help and exit if requested
+// display help or version information and exit if requested
 if (showHelp)
 {
     DisplayHelp();
+    return;
+}
+if (showVersion)
+{
+    DisplayVersion();
     return;
 }
 
@@ -58,9 +65,7 @@ catch (Exception ex)
     Environment.Exit(1);
 }
 
-/// <summary>
-/// Displays help information for the application.
-/// </summary>
+// Displays help information for the application.
 static void DisplayHelp()
 {
     var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
@@ -73,7 +78,8 @@ static void DisplayHelp()
           --help, -h         Display this help message
           --force=y          Overwrite existing files or directories
           --verbose, -v      Display detailed information during execution
-
+          --version          Display version information
+        
         Description:
           This utility creates symbolic links from files in the current directory
           to the appropriate locations in your home directory.
@@ -92,4 +98,34 @@ static void DisplayHelp()
           {{appName}} --force=y    # Overwrite any existing files
           {{appName}} --verbose    # Show detailed information
         """);
+}
+
+// Displays version information for the application.
+static void DisplayVersion()
+{
+    var asm = Assembly.GetEntryAssembly();
+    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+
+    // Get version information
+    var version = "1.0.0";
+    var infoVersion = asm!.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+    if (infoVersion != null)
+    {
+        version = infoVersion.InformationalVersion;
+        var i = version.IndexOf('+');
+        if (i != -1)
+        {
+            version = version.Substring(0, i);
+        }
+    }
+    else
+    {
+        var asmVersion = asm!.GetCustomAttribute<AssemblyVersionAttribute>();
+        if (asmVersion != null)
+        {
+            version = asmVersion.Version;
+        }
+    }
+
+    Console.WriteLine($"{appName} version {version}");
 }
