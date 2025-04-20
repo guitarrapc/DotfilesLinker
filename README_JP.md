@@ -10,6 +10,7 @@ dotfilesリポジトリの構造に基づいて、自動的にファイルをリ
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 # Table of Contents
 
+- [クイックスタート](#%E3%82%AF%E3%82%A4%E3%83%83%E3%82%AF%E3%82%B9%E3%82%BF%E3%83%BC%E3%83%88)
 - [インストール方法](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E6%96%B9%E6%B3%95)
 - [使い方](#%E4%BD%BF%E3%81%84%E6%96%B9)
 - [コマンドオプション](#%E3%82%B3%E3%83%9E%E3%83%B3%E3%83%89%E3%82%AA%E3%83%97%E3%82%B7%E3%83%A7%E3%83%B3)
@@ -18,6 +19,27 @@ dotfilesリポジトリの構造に基づいて、自動的にファイルをリ
 - [設定](#%E8%A8%AD%E5%AE%9A)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## クイックスタート
+
+1. [GitHubリリースページ](https://github.com/guitarrapc/DotfilesLinker/releases/latest)から最新のバイナリをダウンロードし、PATHの通ったディレクトリに配置します。
+2. ターミナルで実行ファイル `DotfilesLinker` を実行します。
+
+```sh
+# 安全モード、既存ファイルを上書きしません
+$ DotfilesLinker
+
+# --force=y オプションで既存ファイルを上書き
+$ DotfilesLinker --force=y
+```
+
+## 動作原理
+
+DotfilesLinkerは、dotfilesリポジトリの構造に基づいてシンボリックリンクを作成します：
+
+- ルートディレクトリのドットファイル → `$HOME` にリンク
+- `HOME` ディレクトリ内のファイル → `$HOME` の対応するパスにリンク
+- `ROOT` ディレクトリ内のファイル → ルートディレクトリ（`/`）の対応するパスにリンク（LinuxとmacOSのみ）
 
 ## インストール方法
 
@@ -121,12 +143,32 @@ drwxr-x--- 18 guitarrapc guitarrapc  4096 Apr 10 03:08 .
 drwxr-xr-x  3 root       root        4096 Mar 27 02:33 ..
 -rw-r--r--  1 guitarrapc guitarrapc  4015 Mar 27 02:38 .bashrc
 lrwxrwxrwx  1 guitarrapc guitarrapc    64 Mar 27 02:38 .bashrc_custom -> /home/guitarrapc/github/guitarrapc/dotfiles/.bashrc_custom
-lrwxrwxrwx  1 guitarrapapc    60 Mar 27 02:38 .gitconfig -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitconfig
+lrwxrwxrwx  1 guitarrapc guitarrapc    60 Mar 27 02:38 .gitconfig -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitconfig
 lrwxrwxrwx  1 guitarrapc guitarrapc    67 Mar 27 02:38 .gitignore_global -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitignore_global
 drwxr-xr-x  2 guitarrapc guitarrapc  4096 Mar 27 02:38 .ssh
+
+$ ls -la ~/.config/aquaproj-aqua/
+total 12
+drwxr-xr-x 2 guitarrapc guitarrapc 4096 Mar 27 02:38 .
+drwxr-xr-x 5 guitarrapc guitarrapc 4096 Mar 27 18:31 ..
+lrwxrwxrwx 1 guitarrapc guitarrapc   86 Mar 27 02:38 aqua.yaml -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.config/aquaproj-aqua/aqua.yam
+
+$ ls -la ~/.ssh
+total 12
+drwxr-xr-x  2 guitarrapc guitarrapc 4096 Mar 27 02:38 .
+drwxr-x--- 18 guitarrapc guitarrapc 4096 Apr 10 03:08 ..
+lrwxrwxrwx  1 guitarrapc guitarrapc   66 Mar 27 02:38 config -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.ssh/config
 ```
 
-## コマンドオプション
+4. 利用可能なすべてのオプションを表示するには、以下のコマンドを実行します：
+
+```bash
+DotfilesLinker --help
+```
+
+## 設定
+
+### コマンドオプション
 
 すべてのオプションは任意です。デフォルトでは、リポジトリ内のすべてのドットファイルに対してシンボリックリンクを作成します。
 
@@ -134,10 +176,10 @@ drwxr-xr-x  2 guitarrapc guitarrapc  4096 Mar 27 02:38 .ssh
 | --- | --- |
 | `--help`, `-h` | ヘルプ情報を表示 |
 | `--version` | バージョン情報を表示 |
-| `--force=y|n` | `y`を指定すると既存のファイルやディレクトリを上書き。|
+| `--force=y` | 既存のファイルやディレクトリを上書き |
 | `--verbose`, `-v` | 実行中の詳細情報を表示 |
 
-## 環境変数
+### 環境変数
 
 DotfilesLinkerは以下の環境変数で設定をカスタマイズできます：
 
@@ -158,24 +200,6 @@ export DOTFILES_HOME=/custom/home/path
 
 # カスタム設定で実行
 DotfilesLinker --force=y
-```
-
-## 動作原理
-
-DotfilesLinkerは、dotfilesリポジトリの構造に基づいてシンボリックリンクを作成します：
-
-- ルートディレクトリのドットファイル → `$HOME` にリンク
-- `HOME` ディレクトリ内のファイル → `$HOME` の対応するパスにリンク
-- `ROOT` ディレクトリ内のファイル → ルートディレクトリ（`/`）の対応するパスにリンク（LinuxとmacOSのみ）
-
-## 設定
-
-### オプション
-
-利用可能なすべてのオプションを表示するには、以下のコマンドを実行してください：
-
-```bash
-DotfilesLinker --help
 ```
 
 ### .dotfiles_ignore

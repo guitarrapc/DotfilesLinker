@@ -33,6 +33,14 @@ $ DotfilesLinker
 $ DotfilesLinker --force=y
 ```
 
+## How It Works
+
+DotfilesLinker creates symbolic links based on your dotfiles repository structure:
+
+- Dotfiles in the root directory → linked to `$HOME`
+- Files in the `HOME` directory → linked to the corresponding path in `$HOME`
+- Files in the `ROOT` directory → linked to the corresponding path in the root directory (`/`) (Linux and macOS only)
+
 ## Installation
 
 Download the latest binary from the [GitHub Releases page](https://github.com/guitarrapc/DotfilesLinker/releases) and place it in a directory that is in your PATH.
@@ -158,7 +166,9 @@ lrwxrwxrwx  1 guitarrapc guitarrapc   66 Mar 27 02:38 config -> /home/guitarrapc
 DotfilesLinker --help
 ```
 
-## Command Options
+## Configuration
+
+### Command Options
 
 All options are optional. The default behavior is to create symbolic links for all dotfiles in the repository.
 
@@ -169,7 +179,7 @@ All options are optional. The default behavior is to create symbolic links for a
 | `--force=y` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
 
-## Environment Variables
+### Environment Variables
 
 DotfilesLinker can be configured using the following environment variables:
 
@@ -191,16 +201,6 @@ export DOTFILES_HOME=/custom/home/path
 # Run with custom settings
 DotfilesLinker --force=y
 ```
-
-## How It Works
-
-DotfilesLinker creates symbolic links based on your dotfiles repository structure:
-
-- Dotfiles in the root directory → linked to `$HOME`
-- Files in the `HOME` directory → linked to the corresponding path in `$HOME`
-- Files in the `ROOT` directory → linked to the corresponding path in the root directory (`/`) (Linux and macOS only)
-
-## Configuration
 
 ### .dotfiles_ignore
 
