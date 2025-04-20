@@ -116,4 +116,4 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           # Create release with all artifacts
-          gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits ./artifacts/*
+          gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits --draft ./artifacts/*
