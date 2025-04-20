@@ -69,6 +69,7 @@ jobs:
           name: ${{ matrix.archive_name }}
           path: ${{ matrix.archive_name }}
           retention-days: 1
+          if-no-files-found: error
 
   release:
     needs: publish
@@ -82,7 +83,6 @@ jobs:
         with:
           path: ./artifacts
           merge-multiple: true
-          error-on-not-found: false
       - name: List artifacts
         shell: bash
         run: |
