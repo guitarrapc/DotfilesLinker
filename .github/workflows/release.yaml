@@ -52,16 +52,15 @@ jobs:
           dotnet-version: 9.0.x
       - name: dotnet publish (Native AOT)
         shell: bash
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
-        working-directory: ./src/DotfilesLinker
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
       - name: Create archive (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ runner.os == 'Windows' }}
         shell: pwsh
-        run: Compress-Archive -Path ./publish/* -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
-        run: tar -czvf ${{ matrix.archive_name }} -C ./publish .
+        run: tar -czvf ${{ matrix.archive_name }} -C ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }} .
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -86,6 +85,26 @@ jobs:
         run: |
           echo "Downloaded artifacts:"
           find ./artifacts -type f | sort
+
+          # Ensure we have artifacts to release
+          if [ -z "$(find ./artifacts -type f)" ]; then
+            echo "::error::No artifacts found. Aborting release creation."
+            exit 1
+          fi
+      - name: Generate checksums and signature
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Create checksums file
+          CHECKSUM_FILE="./artifacts/DotfilesLinker_${TAG}_checksums.txt"
+
+          # Calculate SHA256 checksums for all artifacts
+          cd ./artifacts
+          sha256sum * > "${CHECKSUM_FILE}"
+
+          echo "Generated checksums file:"
+          cat "${CHECKSUM_FILE}"
       - name: Create GitHub Release via gh
         shell: bash
         env:
@@ -93,11 +112,5 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
         run: |
-          # Ensure we have artifacts to release
-          if [ -z "$(find ./artifacts -type f)" ]; then
-            echo "::error::No artifacts found. Aborting release creation."
-            exit 1
-          fi
-
           # Create release with all artifacts
           gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits ./artifacts/*
