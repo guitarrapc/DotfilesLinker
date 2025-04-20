@@ -6,8 +6,10 @@ namespace DotfilesLinker.Services;
 /// <summary>
 /// Provides functionality to link dotfiles from a repository to the user's home directory or system root.
 /// </summary>
-public sealed class FileLinkerService(IFileSystem fileSystem)
+public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = null)
 {
+    private readonly ILogger _logger = logger ?? new NullLogger();
+
     /*-----------------------------------------------------------
      * public APIs
      *----------------------------------------------------------*/
@@ -24,15 +26,24 @@ public sealed class FileLinkerService(IFileSystem fileSystem)
     /// </exception>
     public void LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite)
     {
+        _logger.Info($"Starting to link dotfiles from {repoRoot} to {userHome}");
+        _logger.Info($"Using ignore file: {ignoreFileName}");
+
         // Filter files in the root of the repository
-        var ignore = LoadIgnoreList(Path.Combine(repoRoot, ignoreFileName));
+        var ignorePath = Path.Combine(repoRoot, ignoreFileName);
+        var ignore = LoadIgnoreList(ignorePath);
+        _logger.Verbose($"Loaded {ignore.Count} ignore patterns from {ignorePath}");
+
         var files = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false)
             .Where(p => !ignore.Contains(Path.GetFileName(p)));
+
+        _logger.Info($"Linking {files.Count()} files from repository root to home directory");
 
         // Link files in the root of the repository to $HOME
         foreach (var src in files)
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
+            _logger.Verbose($"Linking {src} to {dst}");
             LinkFile(src, dst, overwrite);
         }
 
@@ -40,14 +51,26 @@ public sealed class FileLinkerService(IFileSystem fileSystem)
         var homeRoot = Path.Combine(repoRoot, "HOME");
         if (fileSystem.DirectoryExists(homeRoot))
         {
-            foreach (var src in fileSystem.EnumerateFiles(homeRoot, "*", recursive: true))
+            _logger.Info($"Processing HOME directory: {homeRoot}");
+            var homeFiles = fileSystem.EnumerateFiles(homeRoot, "*", recursive: true).ToList();
+            _logger.Info($"Found {homeFiles.Count} files to link from HOME directory");
+
+            foreach (var src in homeFiles)
             {
                 var rel = Path.GetRelativePath(homeRoot, src);
                 var dst = Path.Combine(userHome, rel);
 
-                fileSystem.EnsureDirectory(Path.GetDirectoryName(dst)!);
+                var dstDir = Path.GetDirectoryName(dst)!;
+                _logger.Verbose($"Ensuring directory exists: {dstDir}");
+                fileSystem.EnsureDirectory(dstDir);
+
+                _logger.Verbose($"Linking {src} to {dst}");
                 LinkFile(src, dst, overwrite);
             }
+        }
+        else
+        {
+            _logger.Info($"HOME directory not found: {homeRoot}");
         }
 
         // Link files in the ROOT directory (Linux/macOS only)
@@ -56,16 +79,34 @@ public sealed class FileLinkerService(IFileSystem fileSystem)
             var rootRoot = Path.Combine(repoRoot, "ROOT");
             if (fileSystem.DirectoryExists(rootRoot))
             {
-                foreach (var src in fileSystem.EnumerateFiles(rootRoot, "*", recursive: true))
+                _logger.Verbose($"Processing ROOT directory: {rootRoot}");
+                var rootFiles = fileSystem.EnumerateFiles(rootRoot, "*", recursive: true).ToList();
+                _logger.Verbose($"Found {rootFiles.Count} files to link from ROOT directory");
+
+                foreach (var src in rootFiles)
                 {
                     var rel = Path.GetRelativePath(rootRoot, src);
                     var dst = Path.Combine("/", rel);
 
-                    fileSystem.EnsureDirectory(Path.GetDirectoryName(dst)!);
+                    var dstDir = Path.GetDirectoryName(dst)!;
+                    _logger.Verbose($"Ensuring directory exists: {dstDir}");
+                    fileSystem.EnsureDirectory(dstDir);
+
+                    _logger.Verbose($"Linking {src} to {dst}");
                     LinkFile(src, dst, overwrite);
                 }
             }
+            else
+            {
+                _logger.Info($"ROOT directory not found: {rootRoot}");
+            }
         }
+        else
+        {
+            _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
+        }
+
+        _logger.Info("Dotfiles linking completed");
     }
 
     /*-----------------------------------------------------------
@@ -91,21 +132,30 @@ public sealed class FileLinkerService(IFileSystem fileSystem)
 
             // If the target is a symlink and points to the same file, do nothing
             if (currentLinkTarget is not null && PathUtilities.PathEquals(currentLinkTarget, source))
+            {
+                _logger.Success($"Skipping already linked: {target} -> {source}");
                 return;
+            }
 
             if (!overwrite)
+            {
+                _logger.Verbose($"Target {target} exists and overwrite=false, aborting");
                 throw new InvalidOperationException($"'{target}' already exists; use --force=y to overwrite.");
+            }
 
+            _logger.Verbose($"Deleting existing target: {target}");
             fileSystem.Delete(target);
         }
 
         // Create the link
         if (fileSystem.DirectoryExists(source))
         {
+            _logger.Success($"Creating directory symlink: {target} -> {source}");
             fileSystem.CreateDirectorySymlink(target, source);
         }
         else
         {
+            _logger.Success($"Creating file symlink: {target} -> {source}");
             fileSystem.CreateFileSymlink(target, source);
         }
     }
@@ -115,14 +165,20 @@ public sealed class FileLinkerService(IFileSystem fileSystem)
     /// </summary>
     /// <param name="ignoreFilePath">The path to the ignore file.</param>
     /// <returns>A set of file or directory names to ignore.</returns>
-    private static HashSet<string> LoadIgnoreList(string ignoreFilePath)
+    private HashSet<string> LoadIgnoreList(string ignoreFilePath)
     {
-        if (!File.Exists(ignoreFilePath))
+        if (!fileSystem.FileExists(ignoreFilePath))
+        {
+            _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
             return new(StringComparer.Ordinal);
+        }
 
-        return File.ReadAllLines(ignoreFilePath)
-                   .Where(line => !string.IsNullOrWhiteSpace(line))
-                   .Select(line => line.Trim())
-                   .ToHashSet(StringComparer.Ordinal);
+        var lines = fileSystem.ReadAllLines(ignoreFilePath);
+        _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
+
+        return lines
+            .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Select(line => line.Trim())
+            .ToHashSet(StringComparer.Ordinal);
     }
 }

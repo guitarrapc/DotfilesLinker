@@ -267,4 +267,30 @@ public class FileSystemTests
         // Act & Assert
         Assert.Throws<ArgumentException>(() => _fileSystemMock.EnsureDirectory(invalidPath));
     }
+
+    [Fact]
+    public void ReadAllLines_ShouldReturnLinesFromFile()
+    {
+        // Arrange
+        var filePath = "test.txt";
+        var expectedLines = new[] { "line1", "line2", "line3" };
+        _fileSystemMock.ReadAllLines(filePath).Returns(expectedLines);
+
+        // Act
+        var result = _fileSystemMock.ReadAllLines(filePath);
+
+        // Assert
+        Assert.Equal(expectedLines, result);
+    }
+
+    [Fact]
+    public void ReadAllLines_ShouldThrow_WhenFileDoesNotExist()
+    {
+        // Arrange
+        var nonExistentFilePath = "nonexistent.txt";
+        _fileSystemMock.ReadAllLines(nonExistentFilePath).Returns(x => throw new FileNotFoundException());
+
+        // Act & Assert
+        Assert.Throws<FileNotFoundException>(() => _fileSystemMock.ReadAllLines(nonExistentFilePath));
+    }
 }
