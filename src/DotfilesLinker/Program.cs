@@ -1,28 +1,47 @@
 ﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
 
-// ── 引数解析 ───────────────────────────────────────────────
+// parse args
 bool forceOverwrite =
     args.Any(a => a.Equals("--force=y", StringComparison.OrdinalIgnoreCase));
 
-// ── 依存組み立て ───────────────────────────────────────────
+// build up
 var fs = new DefaultFileSystem();
 var svc = new FileLinkerService(fs);
 
 string executionRoot = Environment.CurrentDirectory;
 string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-// ── 実行 ───────────────────────────────────────────────────
+// execute
 try
 {
     svc.LinkDotfiles(executionRoot, userHome, ".dotfiles_ignore", forceOverwrite);
-    svc.LinkHomeFiles(executionRoot, userHome, forceOverwrite);
 
     WriteSuccess("All operations completed.");
 }
+catch (UnauthorizedAccessException ex)
+{
+    WriteError("Permission denied: " + ex.Message);
+    Environment.Exit(1);
+}
+catch (FileNotFoundException ex)
+{
+    WriteError("File not found: " + ex.Message);
+    Environment.Exit(1);
+}
+catch (DirectoryNotFoundException ex)
+{
+    WriteError("Directory not found: " + ex.Message);
+    Environment.Exit(1);
+}
+catch (InvalidOperationException ex)
+{
+    WriteError("Operation failed: " + ex.Message);
+    Environment.Exit(1);
+}
 catch (Exception ex)
 {
-    WriteError(ex.Message);
+    WriteError("An unexpected error occurred: " + ex.Message);
     Environment.Exit(1);
 }
 
