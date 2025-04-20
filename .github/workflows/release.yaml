@@ -52,11 +52,11 @@ jobs:
           dotnet-version: 9.0.x
       - name: dotnet publish (Native AOT)
         shell: bash
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
-        run: Compress-Archive -Path ./publish/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
