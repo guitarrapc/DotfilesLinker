@@ -53,6 +53,7 @@ jobs:
       - name: dotnet publish (Native AOT)
         shell: bash
         run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
+        working-directory: ./src/DotfilesLinker
       - name: Create archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
