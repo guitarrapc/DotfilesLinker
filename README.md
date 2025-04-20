@@ -11,11 +11,9 @@ Depends on your dotfiles repository structure, DotfilesLinker will link your dot
 # Table of Contents
 
 - [Quick Start](#quick-start)
+- [How It Works](#how-it-works)
 - [Installation](#installation)
 - [Usage](#usage)
-- [Command Options](#command-options)
-- [Environment Variables](#environment-variables)
-- [How It Works](#how-it-works)
 - [Configuration](#configuration)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -32,6 +30,14 @@ $ DotfilesLinker
 # use --force=y to overwrite destination files
 $ DotfilesLinker --force=y
 ```
+
+## How It Works
+
+DotfilesLinker creates symbolic links based on your dotfiles repository structure:
+
+- Dotfiles in the root directory → linked to `$HOME`
+- Files in the `HOME` directory → linked to the corresponding path in `$HOME`
+- Files in the `ROOT` directory → linked to the corresponding path in the root directory (`/`) (Linux and macOS only)
 
 ## Installation
 
@@ -158,7 +164,9 @@ lrwxrwxrwx  1 guitarrapc guitarrapc   66 Mar 27 02:38 config -> /home/guitarrapc
 DotfilesLinker --help
 ```
 
-## Command Options
+## Configuration
+
+### Command Options
 
 All options are optional. The default behavior is to create symbolic links for all dotfiles in the repository.
 
@@ -169,7 +177,7 @@ All options are optional. The default behavior is to create symbolic links for a
 | `--force=y` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
 
-## Environment Variables
+### Environment Variables
 
 DotfilesLinker can be configured using the following environment variables:
 
@@ -191,16 +199,6 @@ export DOTFILES_HOME=/custom/home/path
 # Run with custom settings
 DotfilesLinker --force=y
 ```
-
-## How It Works
-
-DotfilesLinker creates symbolic links based on your dotfiles repository structure:
-
-- Dotfiles in the root directory → linked to `$HOME`
-- Files in the `HOME` directory → linked to the corresponding path in `$HOME`
-- Files in the `ROOT` directory → linked to the corresponding path in the root directory (`/`) (Linux and macOS only)
-
-## Configuration
 
 ### .dotfiles_ignore
 
