@@ -53,15 +53,14 @@ jobs:
       - name: dotnet publish (Native AOT)
         shell: bash
         run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
-        working-directory: ./src/DotfilesLinker
       - name: Create archive (Windows)
-        if: runner.os == 'Windows'
+        if: ${{ runner.os != 'Windows' }}
         shell: pwsh
-        run: Compress-Archive -Path ./publish/* -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path ./publish/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
-        if: runner.os != 'Windows'
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
-        run: tar -czvf ${{ matrix.archive_name }} -C ./publish .
+        run: tar -czvf ${{ matrix.archive_name }} -C ./publish/publish/DotfilesLinker/release_${{ matrix.rid }} .
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

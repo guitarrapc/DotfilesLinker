@@ -6,13 +6,14 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <TrimMode>full</TrimMode>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'EnableAot' == 'true'">
+  <PropertyGroup>
     <PublishAot>true</PublishAot>
     <SelfContained>true</SelfContained>
+    <StripSymbols>false</StripSymbols>
+    <TrimMode>full</TrimMode>
   </PropertyGroup>
 
 </Project>
