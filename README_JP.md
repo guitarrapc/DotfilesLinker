@@ -149,7 +149,7 @@ $ ls -la ~/.config/aquaproj-aqua/
 total 12
 drwxr-xr-x 2 guitarrapc guitarrapc 4096 Mar 27 02:38 .
 drwxr-xr-x 5 guitarrapc guitarrapc 4096 Mar 27 18:31 ..
-lrwxrwxrwx 1 guitarrapc guitarrapc   86 Mar 27 02:38 aqua.yaml -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.config/aquaproj-aqua/aqua.yam
+lrwxrwxrwx 1 guitarrapc guitarrapc   86 Mar 27 02:38 aqua.yaml -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.config/aquaproj-aqua/aqua.yaml
 
 $ ls -la ~/.ssh
 total 12
