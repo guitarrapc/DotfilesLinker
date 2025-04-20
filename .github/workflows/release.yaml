@@ -1,14 +1,38 @@
 name: Release
 on:
   push:
-    tags: ['*.*.*']        # 1.2.3
+    tags:
+      - '*.*.*'        # 1.2.3
 
 jobs:
   publish:
-    runs-on: windows-latest # Native AOT should be built on Windows
+    strategy:
+      # see: https://docs.github.com/ja/actions/using-github-hosted-runners/using-github-hosted-runners/about-github-hosted-runners
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            rid: win-x64
+            archive_name: DotfilesLinker_win_amd64.zip
+          - os: windows-11-arm
+            rid: win-arm64
+            archive_name: DotfilesLinker_win_arm64.zip
+          - os: ubuntu-24.04
+            rid: linux-x64
+            archive_name: DotfilesLinker_linux_amd64.tar.gz
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+            archive_name: DotfilesLinker_linux_arm64.tar.gz
+          - os: macos-13
+            rid: osx-x64
+            archive_name: DotfilesLinker_darwin_amd64.tar.gz
+          - os: macos-15
+            rid: osx-arm64
+            archive_name: DotfilesLinker_darwin_arm64.tar.gz
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Verify tag is pure semver x.y.z
         shell: bash
@@ -28,16 +52,52 @@ jobs:
           dotnet-version: 9.0.x
       - name: dotnet publish (Native AOT)
         shell: bash
-        run: dotnet publish --artifacts-path ./publish
-      - name: Create zip
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path publish -p:EnableAot=true
+        working-directory: ./src/DotfilesLinker
+      - name: Create archive (Windows)
+        if: runner.os == 'Windows'
         shell: pwsh
+        run: Compress-Archive -Path ./publish/* -DestinationPath ${{ matrix.archive_name }}
+      - name: Create archive (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -czvf ${{ matrix.archive_name }} -C ./publish .
+      - name: Upload artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.archive_name }}
+          path: ${{ matrix.archive_name }}
+
+  release:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    timeout-minutes: 5
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        with:
+          path: ./artifacts
+          merge-multiple: true
+          error-on-not-found: false
+      - name: List artifacts
+        shell: bash
         run: |
-          $pub = "publish/publish/DotfilesLinker/release_win-x64"
-          Compress-Archive -Path "$pub/*" -DestinationPath DotfilesLinker-win-x64.zip
+          echo "Downloaded artifacts:"
+          find ./artifacts -type f | sort
       - name: Create GitHub Release via gh
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits DotfilesLinker-win-x64.zip
+        run: |
+          # Ensure we have artifacts to release
+          if [ -z "$(find ./artifacts -type f)" ]; then
+            echo "::error::No artifacts found. Aborting release creation."
+            exit 1
+          fi
+
+          # Create release with all artifacts
+          gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits ./artifacts/*
