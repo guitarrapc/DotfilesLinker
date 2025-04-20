@@ -1,4 +1,4 @@
-using DotfilesLinker.Infrastructure;
+﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
 
 // ── 引数解析 ───────────────────────────────────────────────
@@ -6,18 +6,17 @@ bool forceOverwrite =
     args.Any(a => a.Equals("--force=y", StringComparison.OrdinalIgnoreCase));
 
 // ── 依存組み立て ───────────────────────────────────────────
-var fs = new WindowsFileSystem();
+var fs = new DefaultFileSystem();
 var svc = new FileLinkerService(fs);
 
-string repoRoot = Environment.CurrentDirectory;
-string userHome = Environment.GetFolderPath(
-                      Environment.SpecialFolder.UserProfile);
+string executionRoot = Environment.CurrentDirectory;
+string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
 // ── 実行 ───────────────────────────────────────────────────
 try
 {
-    svc.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", forceOverwrite);
-    svc.LinkHomeFiles(repoRoot, userHome, forceOverwrite);
+    svc.LinkDotfiles(executionRoot, userHome, ".dotfiles_ignore", forceOverwrite);
+    svc.LinkHomeFiles(executionRoot, userHome, forceOverwrite);
 
     WriteSuccess("All operations completed.");
 }

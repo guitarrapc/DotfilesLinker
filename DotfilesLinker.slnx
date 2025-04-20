@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/DotfilesLinker.Tests/DotfilesLinker.Tests.csproj" Id="e835014f-4d39-487b-8bbd-f7089e3efb57" />
     <Project Path="src/DotfilesLinker/DotfilesLinker.csproj" />
   </Folder>
 </Solution>

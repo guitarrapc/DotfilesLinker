@@ -1,6 +1,6 @@
 ﻿namespace DotfilesLinker.Infrastructure;
 
-public sealed class WindowsFileSystem : IFileSystem
+public sealed class DefaultFileSystem : IFileSystem
 {
     public bool FileExists(string p) => File.Exists(p);
     public bool DirectoryExists(string p) => Directory.Exists(p);
@@ -9,8 +9,14 @@ public sealed class WindowsFileSystem : IFileSystem
 
     public void Delete(string p)
     {
-        if (File.Exists(p)) File.Delete(p);
-        else if (Directory.Exists(p)) Directory.Delete(p, recursive: false);
+        if (File.Exists(p))
+        {
+            File.Delete(p);
+        }
+        else if (Directory.Exists(p))
+        {
+            Directory.Delete(p, recursive: false);
+        }
     }
 
     public void CreateFileSymlink(string link, string target) =>
