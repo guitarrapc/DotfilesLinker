@@ -82,7 +82,7 @@ static void DisplayHelp()
           --force=y          Overwrite existing files or directories
           --verbose, -v      Display detailed information during execution
           --version          Display version information
-        
+
         Description:
           This utility creates symbolic links from files in the current directory
           to the appropriate locations in your home directory.
@@ -95,6 +95,11 @@ static void DisplayHelp()
 
         Ignore File:
           Files listed in 'dotfiles_ignore' will be excluded from linking
+
+        Environment Variables:
+          DOTFILES_ROOT            Directory containing dotfiles (default: current directory)
+          DOTFILES_HOME            Target home directory (default: user's home directory)
+          DOTFILES_IGNORE_FILE     Name of ignore file (default: dotfiles_ignore)
 
         Examples:
           {{appName}}              # Link dotfiles using default settings

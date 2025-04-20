@@ -105,7 +105,7 @@ drwxr-x--- 18 guitarrapc guitarrapc  4096 Apr 10 03:08 .
 drwxr-xr-x  3 root       root        4096 Mar 27 02:33 ..
 -rw-r--r--  1 guitarrapc guitarrapc  4015 Mar 27 02:38 .bashrc
 lrwxrwxrwx  1 guitarrapc guitarrapc    64 Mar 27 02:38 .bashrc_custom -> /home/guitarrapc/github/guitarrapc/dotfiles/.bashrc_custom
-lrwxrwxrwx  1 guitarrapc guitarrapc    60 Mar 27 02:38 .gitconfig -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitconfig
+lrwxrwxrwx  1 guitarrapapc    60 Mar 27 02:38 .gitconfig -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitconfig
 lrwxrwxrwx  1 guitarrapc guitarrapc    67 Mar 27 02:38 .gitignore_global -> /home/guitarrapc/github/guitarrapc/dotfiles/.gitignore_global
 drwxr-xr-x  2 guitarrapc guitarrapc  4096 Mar 27 02:38 .ssh
 ```
@@ -118,8 +118,31 @@ drwxr-xr-x  2 guitarrapc guitarrapc  4096 Mar 27 02:38 .ssh
 | --- | --- |
 | `--help`, `-h` | ヘルプ情報を表示 |
 | `--version` | バージョン情報を表示 |
-| `--force=y|n` | `y`を指定すると既存のファイルやディレクトリを上書き。デフォルト: `n` |
+| `--force=y|n` | `y`を指定すると既存のファイルやディレクトリを上書き。|
 | `--verbose`, `-v` | 実行中の詳細情報を表示 |
+
+## 環境変数
+
+DotfilesLinkerは以下の環境変数で設定をカスタマイズできます：
+
+| 変数 | 説明 | デフォルト値 |
+| --- | --- | --- |
+| `DOTFILES_ROOT` | dotfilesリポジトリのルートディレクトリ | カレントディレクトリ |
+| `DOTFILES_HOME` | ユーザーのホームディレクトリ | ユーザープロファイルディレクトリ（`$HOME`） |
+| `DOTFILES_IGNORE_FILE` | 除外ファイルの名前 | `dotfiles_ignore` |
+
+環境変数を使用する例：
+
+```sh
+# カスタムdotfilesリポジトリのパスを設定
+export DOTFILES_ROOT=/path/to/my/dotfiles
+
+# カスタムホームディレクトリを設定
+export DOTFILES_HOME=/custom/home/path
+
+# カスタム設定で実行
+DotfilesLinker --force=y
+```
 
 ## 動作原理
 
@@ -130,6 +153,14 @@ DotfilesLinkerは、dotfilesリポジトリの構造に基づいてシンボリ�
 - `ROOT` ディレクトリ内のファイル → ルートディレクトリ（`/`）の対応するパスにリンク（LinuxとmacOSのみ）
 
 ## 設定
+
+### オプション
+
+利用可能なすべてのオプションを表示するには、以下のコマンドを実行してください：
+
+```bash
+DotfilesLinker --help
+```
 
 ### .dotfiles_ignore
 
@@ -148,11 +179,3 @@ LICENSE
 以下のファイルやディレクトリは自動的に除外されます：
 - `.git` で始まるディレクトリ（`.github` など）
 - ルートディレクトリの非ドットファイル（先頭が `.` でないファイル）
-
-## オプション
-
-利用可能なすべてのオプションを表示するには、以下のコマンドを実行してください：
-
-```bash
-DotfilesLinker --help
-```

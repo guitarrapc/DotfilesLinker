@@ -3,6 +3,19 @@
 Link dotfiles from a repository to your home/root directory.
 Depends on your dotfiles repository structure, DotfilesLinker will link your dotfiles.
 
+## Quick Start
+
+1. Download the latest binary from the [GitHub Releases page](https://github.com/guitarrapc/DotfilesLinker/releases/latest) and place it in a directory that is in your PATH.
+2. Run executable file `DotfilesLinker` in your terminal.
+
+```sh
+# Safe mode, do not overwrite existing files
+$ DotfilesLinker
+
+# use --force=y to overwrite destination files
+$ DotfilesLinker --force=y
+```
+
 ## Installation
 
 Download the latest binary from the [GitHub Releases page](https://github.com/guitarrapc/DotfilesLinker/releases) and place it in a directory that is in your PATH.
@@ -122,6 +135,12 @@ drwxr-x--- 18 guitarrapc guitarrapc 4096 Apr 10 03:08 ..
 lrwxrwxrwx  1 guitarrapc guitarrapc   66 Mar 27 02:38 config -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.ssh/config
 ```
 
+4. Run the following command to see all available options:
+
+```bash
+DotfilesLinker --help
+```
+
 ## Command Options
 
 All options are optional. The default behavior is to create symbolic links for all dotfiles in the repository.
@@ -130,8 +149,31 @@ All options are optional. The default behavior is to create symbolic links for a
 | --- | --- |
 | `--help`, `-h` | Display help information |
 | `--version` | Display version information |
-| `--force=y|n` | Overwrite existing files or directories with `y`. default: `n` |
+| `--force=y` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
+
+## Environment Variables
+
+DotfilesLinker can be configured using the following environment variables:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `DOTFILES_ROOT` | Root directory of your dotfiles repository | Current directory |
+| `DOTFILES_HOME` | User's home directory | User profile directory (`$HOME`) |
+| `DOTFILES_IGNORE_FILE` | Name of the ignore file | `dotfiles_ignore` |
+
+Example usage with environment variables:
+
+```sh
+# Set custom dotfiles repository path
+export DOTFILES_ROOT=/path/to/my/dotfiles
+
+# Set custom home directory
+export DOTFILES_HOME=/custom/home/path
+
+# Run with custom settings
+DotfilesLinker --force=y
+```
 
 ## How It Works
 
@@ -160,11 +202,3 @@ LICENSE
 The following files and directories are automatically excluded:
 - Directories starting with `.git` (like `.github`)
 - Non-dotfiles in the root directory
-
-## Options
-
-Run the following command to see all available options:
-
-```bash
-DotfilesLinker --help
-```
