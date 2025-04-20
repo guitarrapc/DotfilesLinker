@@ -25,17 +25,20 @@ var fs = new DefaultFileSystem();
 var logger = new ConsoleLogger(verbose);
 var svc = new FileLinkerService(fs, logger);
 
-string executionRoot = Environment.CurrentDirectory;
-string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+// Get configuration from environment variables or use defaults
+string executionRoot = Environment.GetEnvironmentVariable("DOTFILES_ROOT") ?? Environment.CurrentDirectory;
+string userHome = Environment.GetEnvironmentVariable("DOTFILES_HOME") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+string ignoreFileName = Environment.GetEnvironmentVariable("DOTFILES_IGNORE_FILE") ?? "dotfiles_ignore";
 
 logger.Info($"Execution root: {executionRoot}");
 logger.Info($"User home: {userHome}");
+logger.Info($"Ignore file: {ignoreFileName}");
 logger.Info($"Force overwrite: {forceOverwrite}");
 
 // execute
 try
 {
-    svc.LinkDotfiles(executionRoot, userHome, "dotfiles_ignore", forceOverwrite);
+    svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, forceOverwrite);
 
     logger.Success("All operations completed.");
 }
