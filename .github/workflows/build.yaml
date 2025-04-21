@@ -52,6 +52,7 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-24.04
+    timeout-minutes: 1
     steps:
       - name: result
         run: exit 0
