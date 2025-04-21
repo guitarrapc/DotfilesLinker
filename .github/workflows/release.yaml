@@ -115,7 +115,9 @@ jobs:
         uses: anchore/sbom-action/download-syft@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
       # Setup Cosign keys for signing
       - name: Setup Cosign keys
-        run: echo "${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}" > cosign.key
+        run: |
+          echo "${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}" > cosign.key
+          chmod 600 cosign.key
       - name: Generate checksums and signature
         shell: bash
         env:
