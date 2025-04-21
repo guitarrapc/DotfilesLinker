@@ -66,6 +66,7 @@ $ scoop install DotfilesLinker
 
 ```bash
 git clone https://github.com/guitarrapc/DotfilesLinker.git
+cd DotfilesLinker
 dotnet publish -r win-x64 --artifacts-path ./artifacts
 ```
 
