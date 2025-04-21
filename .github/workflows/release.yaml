@@ -133,13 +133,33 @@ jobs:
             cat "${CHECKSUM_FILE}"
           cd ..
 
-          # Generate SBOM for each artifact
+          # Generate SBOM for each artifact with improved details
           echo "Generating SBOMs for artifacts..."
           for file in ./artifacts/*.{zip,tar.gz}; do
             if [ -f "$file" ]; then
               basename=$(basename "$file")
               echo "Generating SBOM for $basename"
-              syft "$file" -o spdx-json > "./artifacts/${basename}.sbom.json"
+
+              # Create temporary directory for extraction
+              temp_dir=$(mktemp -d)
+
+              # Extract archive based on its type
+              if [[ "$file" == *.zip ]]; then
+                unzip -q "$file" -d "$temp_dir"
+              else
+                tar -xzf "$file" -C "$temp_dir"
+              fi
+
+              # Generate detailed SBOM from extracted contents
+              syft dir:"$temp_dir" -o spdx-json --file-metadata=all --catalogers all > "./artifacts/${basename}.sbom.json"
+
+              # Add license info if available
+              if [ -f "$temp_dir/LICENSE" ] || [ -f "$temp_dir/LICENSE.md" ] || [ -f "$temp_dir/LICENSE.txt" ]; then
+                echo "Found license information in archive"
+              fi
+
+              # Clean up temporary directory
+              rm -rf "$temp_dir"
             fi
           done
 
