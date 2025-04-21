@@ -16,6 +16,7 @@ C# Native AOTで実装された高速な dotfiles シンボリックリンク作
 - [インストール方法](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E6%96%B9%E6%B3%95)
 - [使い方](#%E4%BD%BF%E3%81%84%E6%96%B9)
 - [設定](#%E8%A8%AD%E5%AE%9A)
+- [セキュリティ](#%E3%82%BB%E3%82%AD%E3%83%A5%E3%83%AA%E3%83%86%E3%82%A3)
 - [ライセンス](#%E3%83%A9%E3%82%A4%E3%82%BB%E3%83%B3%E3%82%B9)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -219,6 +220,28 @@ LICENSE
 以下のファイルやディレクトリは自動的に除外されます：
 - `.git` で始まるディレクトリ（`.github` など）
 - ルートディレクトリの非ドットファイル（先頭が `.` でないファイル）
+
+## セキュリティ
+
+すべてのリリースアーティファクトは、整合性と信頼性を確保するために[Cosign](https://github.com/sigstore/cosign)を使用してデジタル署名されています。これにより、Windows Defenderなどのウイルス対策ソフトウェアからのセキュリティ警告を防止できます。
+
+### 署名の検証
+
+[Cosign CLI](https://github.com/sigstore/cosign#installation)を使用して署名を検証できます：
+
+```bash
+# 公開鍵をダウンロード（初回のみ必要）
+curl -O https://raw.githubusercontent.com/guitarrapc/DotfilesLinker/main/cosign.pub
+
+# アーティファクトを検証（ダウンロードしたアーティファクトに合わせて変更）
+cosign verify-blob --key cosign.pub --signature DotfilesLinker_win_amd64.zip.sig DotfilesLinker_win_amd64.zip
+```
+
+検証が成功すれば、そのファイルが公式にリリースされ、改ざんされていないことが確認できます。
+
+各リリースには以下も含まれています：
+- SBOM（ソフトウェア部品表）ファイル（SPDX形式）
+- すべてのアーティファクトのSHA256チェックサム
 
 ## ライセンス
 

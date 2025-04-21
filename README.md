@@ -16,6 +16,7 @@ Fast C# Native AOT utility to create symbolic links from dotfiles to your home d
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [Security](#security)
 - [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
@@ -219,6 +220,28 @@ LICENSE
 The following files and directories are automatically excluded:
 - Directories starting with `.git` (like `.github`)
 - Non-dotfiles in the root directory
+
+## Security
+
+All release artifacts are digitally signed using [Cosign](https://github.com/sigstore/cosign) to ensure their integrity and authenticity. This helps prevent security warnings from antivirus software like Windows Defender.
+
+### Verifying Signatures
+
+You can verify the signatures using the [Cosign CLI](https://github.com/sigstore/cosign#installation):
+
+```bash
+# Download the public key (only needed once)
+curl -O https://raw.githubusercontent.com/guitarrapc/DotfilesLinker/main/cosign.pub
+
+# Verify an artifact (replace with the artifact you downloaded)
+cosign verify-blob --key cosign.pub --signature DotfilesLinker_win_amd64.zip.sig DotfilesLinker_win_amd64.zip
+```
+
+A successful verification confirms the file was released officially and has not been tampered with.
+
+Each release also includes:
+- SBOM (Software Bill of Materials) files in SPDX format
+- SHA256 checksums for all artifacts
 
 ## License
 
