@@ -105,26 +105,69 @@ jobs:
             echo "::error::No artifacts found. Aborting release creation."
             exit 1
           fi
+      # Install Cosign for signing artifacts
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
+        with:
+          cosign-release: v2.5.0
+      # Install Syft for SBOM generation
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
+      # Setup Cosign keys for signing
+      - name: Setup Cosign keys
+        run: |
+          echo "${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}" > cosign.key
+          chmod 600 cosign.key
       - name: Generate checksums and signature
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
+          COSIGN_PASSWORD: ${{ secrets.SYNCED_COSIGN_PASSWORD }}
         run: |
           # Create checksums file
           CHECKSUM_FILE="./DotfilesLinker_${TAG}_checksums.txt"
 
           # Calculate SHA256 checksums for all artifacts
           cd ./artifacts
-          sha256sum * > "${CHECKSUM_FILE}"
+            sha256sum * > "${CHECKSUM_FILE}"
+            cat "${CHECKSUM_FILE}"
+          cd ..
 
-          echo "Generated checksums file:"
-          cat "${CHECKSUM_FILE}"
+          # Generate SBOM for each artifact
+          echo "Generating SBOMs for artifacts..."
+          for file in ./artifacts/*.{zip,tar.gz}; do
+            if [ -f "$file" ]; then
+              basename=$(basename "$file")
+              echo "Generating SBOM for $basename"
+              syft "$file" -o spdx-json > "./artifacts/${basename}.sbom.json"
+            fi
+          done
+
+          # Sign each artifact with Cosign
+          echo "Signing artifacts with Cosign..."
+          for file in ./artifacts/*.{zip,tar.gz}; do
+            if [ -f "$file" ]; then
+              echo "Signing $file"
+              cosign sign-blob --key cosign.key "$file" > "${file}.sig"
+
+              # Also sign the SBOM
+              sbom_file="${file}.sbom.json"
+              if [ -f "$sbom_file" ]; then
+                echo "Signing SBOM $sbom_file"
+                cosign sign-blob --key cosign.key "$sbom_file" > "${sbom_file}.sig"
+              fi
+            fi
+          done
+
+      # Clean up sensitive files
+      - name: Clean up cosign key
+        if: always()
+        run: rm -f cosign.key
+
       - name: Create GitHub Release via gh
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ github.ref_name }}
-        run: |
-          # Create release with all artifacts
-          gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits --draft ./artifacts/*
+        run: gh release create "$TAG" --title "v$TAG" --generate-notes --fail-on-no-commits --draft ./artifacts/*
