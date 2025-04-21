@@ -113,36 +113,68 @@ jobs:
       # Install Syft for SBOM generation
       - name: Install Syft
         uses: anchore/sbom-action/download-syft@f325610c9f50a54015d37c8d16cb3b0e2c8f4de0 # v0.18.0
+
       # Setup Cosign keys for signing
       - name: Setup Cosign keys
         run: |
           echo "${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}" > cosign.key
           chmod 600 cosign.key
-      - name: Generate checksums and signature
+
+      # Generate SHA256 checksums for all artifacts
+      - name: Generate checksums
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
-          COSIGN_PASSWORD: ${{ secrets.SYNCED_COSIGN_PASSWORD }}
         run: |
           # Create checksums file
           CHECKSUM_FILE="./DotfilesLinker_${TAG}_checksums.txt"
 
-          # Calculate SHA256 checksums for all artifacts
+          # Calculate SHA256 checksums
           cd ./artifacts
-            sha256sum * > "${CHECKSUM_FILE}"
-            cat "${CHECKSUM_FILE}"
+          sha256sum * > "${CHECKSUM_FILE}"
+          cat "${CHECKSUM_FILE}"
           cd ..
 
-          # Generate SBOM for each artifact
+      # Generate SBOM for each artifact
+      - name: Generate SBOMs
+        shell: bash
+        run: |
+          # Generate SBOM for each artifact with improved details
           echo "Generating SBOMs for artifacts..."
           for file in ./artifacts/*.{zip,tar.gz}; do
             if [ -f "$file" ]; then
               basename=$(basename "$file")
               echo "Generating SBOM for $basename"
-              syft "$file" -o spdx-json > "./artifacts/${basename}.sbom.json"
+
+              # Create temporary directory for extraction
+              temp_dir=$(mktemp -d)
+
+              # Extract archive based on its type
+              if [[ "$file" == *.zip ]]; then
+                unzip -q "$file" -d "$temp_dir"
+              else
+                tar -xzf "$file" -C "$temp_dir"
+              fi
+
+              # Generate detailed SBOM from extracted contents
+              syft dir:"$temp_dir" -o spdx-json --file-metadata=all --catalogers all > "./artifacts/${basename}.sbom.json"
+
+              # Add license info if available
+              if [ -f "$temp_dir/LICENSE" ] || [ -f "$temp_dir/LICENSE.md" ] || [ -f "$temp_dir/LICENSE.txt" ]; then
+                echo "Found license information in archive"
+              fi
+
+              # Clean up temporary directory
+              rm -rf "$temp_dir"
             fi
           done
 
+      # Sign artifacts and SBOMs with Cosign
+      - name: Sign artifacts with Cosign
+        shell: bash
+        env:
+          COSIGN_PASSWORD: ${{ secrets.SYNCED_COSIGN_PASSWORD }}
+        run: |
           # Sign each artifact with Cosign
           echo "Signing artifacts with Cosign..."
           for file in ./artifacts/*.{zip,tar.gz}; do

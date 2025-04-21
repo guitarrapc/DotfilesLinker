@@ -1,0 +1,18 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- NuGet deterministic build -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- NuGet SourceLink -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- NuGet Missing Compiler Flags -->
+    <Features>strict</Features>
+  </PropertyGroup>
+
+</Project>
