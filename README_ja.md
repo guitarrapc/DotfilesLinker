@@ -11,11 +11,12 @@ C# Native AOTで実装された高速な dotfiles シンボリックリンク作
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 # Table of Contents
 
-- [クイックスタート](#%E3%82%AF%E3%82%A4%E3%83%83%E3%82%AF%E3%82%B9%E3%82%BF%E3%83%BC%E3%83%88)
-- [動作原理](#%E5%8B%95%E4%BD%9C%E5%8E%9F%E7%90%86)
-- [インストール方法](#%E3%82%A4%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%AB%E6%96%B9%E6%B3%95)
-- [使い方](#%E4%BD%BF%E3%81%84%E6%96%B9)
-- [設定](#%E8%A8%AD%E5%AE%9A)
+- [クイックスタート](#クイックスタート)
+- [動作原理](#動作原理)
+- [インストール方法](#インストール方法)
+- [使い方](#使い方)
+- [設定](#設定)
+- [ライセンス](#ライセンス)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -201,12 +202,12 @@ export DOTFILES_HOME=/custom/home/path
 DotfilesLinker --force=y
 ```
 
-### .dotfiles_ignore
+### dotfiles_ignore ファイル
 
-`.dotfiles_ignore` ファイルを使用して、リンク作成から除外するファイルやディレクトリを指定できます：
+`dotfiles_ignore` ファイルを使用して、リンク作成から除外するファイルやディレクトリを指定できます：
 
 ```
-# .dotfiles_ignore の例
+# dotfiles_ignore の例
 .git
 .github
 README.md
@@ -218,3 +219,7 @@ LICENSE
 以下のファイルやディレクトリは自動的に除外されます：
 - `.git` で始まるディレクトリ（`.github` など）
 - ルートディレクトリの非ドットファイル（先頭が `.` でないファイル）
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています - 詳細は[LICENSE](LICENSE)ファイルをご覧ください。

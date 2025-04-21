@@ -5,7 +5,7 @@
 
 # DotfilesLinker
 
-Fast C# Native AOT utility to create symbolic links from dotfiles to your home directory
+Fast C# Native AOT utility to create symbolic links from dotfiles to your home directory. Supports Windows, Linux, and macOS while respecting your dotfiles repository structure.
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -16,6 +16,7 @@ Fast C# Native AOT utility to create symbolic links from dotfiles to your home d
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
+- [License](#license)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -150,7 +151,7 @@ $ ls -la ~/.config/aquaproj-aqua/
 total 12
 drwxr-xr-x 2 guitarrapc guitarrapc 4096 Mar 27 02:38 .
 drwxr-xr-x 5 guitarrapc guitarrapc 4096 Mar 27 18:31 ..
-lrwxrwxrwx 1 guitarrapc guitarrapc   86 Mar 27 02:38 aqua.yaml -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.config/aquaproj-aqua/aqua.yam
+lrwxrwxrwx 1 guitarrapc guitarrapc   86 Mar 27 02:38 aqua.yaml -> /home/guitarrapc/github/guitarrapc/dotfiles/HOME/.config/aquaproj-aqua/aqua.yaml
 
 $ ls -la ~/.ssh
 total 12
@@ -201,12 +202,12 @@ export DOTFILES_HOME=/custom/home/path
 DotfilesLinker --force=y
 ```
 
-### .dotfiles_ignore
+### dotfiles_ignore File
 
-You can specify files or directories to be excluded from linking in the `.dotfiles_ignore` file:
+You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file:
 
 ```
-# Example .dotfiles_ignore
+# Example dotfiles_ignore
 .git
 .github
 README.md
@@ -218,3 +219,7 @@ LICENSE
 The following files and directories are automatically excluded:
 - Directories starting with `.git` (like `.github`)
 - Non-dotfiles in the root directory
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
