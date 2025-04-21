@@ -55,6 +55,17 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version="${TAG}" --artifacts-path ./artifacts
+      - name: Remove debug symbols
+        shell: bash
+        run: |
+          # Remove PDB files (Windows)
+          find ./artifacts -name "*.pdb" -type f -delete
+          # Remove dSYM directories (macOS)
+          find ./artifacts -name "*.dSYM" -type d -exec rm -rf {} +
+          # Remove debug symbol files that might be present on Linux
+          find ./artifacts -name "*.dbg" -type f -delete
+
+          echo "Removed debug symbols files"
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
