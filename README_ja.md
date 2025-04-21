@@ -44,12 +44,30 @@ DotfilesLinkerは、dotfilesリポジトリの構造に基づいてシンボリ�
 
 ## インストール方法
 
+### Scoop (Windows)
+
+[Scoop](https://scoop.sh/)を使用してDotfilesLinkerをインストールできます：
+
+```sh
+$ scoop bucket add guitarrapc https://github.com/guitarrapc/scoop-bucket.git
+$ scoop install DotfilesLinker
+```
+
+### バイナリダウンロード
+
 [GitHubリリースページ](https://github.com/guitarrapc/DotfilesLinker/releases)から最新のバイナリをダウンロードし、PATHの通ったディレクトリに配置してください。
 
 対応プラットフォーム:
 - Windows (x64, ARM64)
 - Linux (x64, ARM64)
 - macOS (x64, ARM64)
+
+### ソースからビルド
+
+```bash
+git clone https://github.com/guitarrapc/DotfilesLinker.git
+dotnet publish -r win-x64 --artifacts-path ./artifacts
+```
 
 ## 使い方
 

@@ -44,12 +44,30 @@ DotfilesLinker creates symbolic links based on your dotfiles repository structur
 
 ## Installation
 
+### Scoop (Windows)
+
+Install DotfilesLinker using [Scoop](https://scoop.sh/):
+
+```sh
+$ scoop bucket add guitarrapc https://github.com/guitarrapc/scoop-bucket.git
+$ scoop install DotfilesLinker
+```
+
+### Download Binary
+
 Download the latest binary from the [GitHub Releases page](https://github.com/guitarrapc/DotfilesLinker/releases) and place it in a directory that is in your PATH.
 
 Available platforms:
 - Windows (x64, ARM64)
 - Linux (x64, ARM64)
 - macOS (x64, ARM64)
+
+### Build from Source
+
+```bash
+git clone https://github.com/guitarrapc/DotfilesLinker.git
+dotnet publish -r win-x64 --artifacts-path ./artifacts
+```
 
 ## Usage
 
