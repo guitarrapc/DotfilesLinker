@@ -148,13 +148,13 @@ jobs:
           for file in ./artifacts/*.{zip,tar.gz}; do
             if [ -f "$file" ]; then
               echo "Signing $file"
-              cosign sign-blob --key cosign.key "$file" > "${file}.sig"
+              cosign sign-blob --key cosign.key --yes "$file" > "${file}.sig"
 
               # Also sign the SBOM
               sbom_file="${file}.sbom.json"
               if [ -f "$sbom_file" ]; then
                 echo "Signing SBOM $sbom_file"
-                cosign sign-blob --key cosign.key "$sbom_file" > "${sbom_file}.sig"
+                cosign sign-blob --key cosign.key --yes "$sbom_file" > "${sbom_file}.sig"
               fi
             fi
           done
