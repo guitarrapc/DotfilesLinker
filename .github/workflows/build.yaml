@@ -25,9 +25,9 @@ jobs:
             rid: osx-x64
           - os: macos-15
             rid: osx-arm64
-    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

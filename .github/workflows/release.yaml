@@ -29,9 +29,9 @@ jobs:
           - os: macos-15
             rid: osx-arm64
             archive_name: DotfilesLinker_darwin_arm64.tar.gz
-    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
       - name: Verify tag is pure semver x.y.z
@@ -84,9 +84,9 @@ jobs:
 
   release:
     needs: publish
-    runs-on: ubuntu-24.04
     permissions:
       contents: write
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Download all artifacts
@@ -126,10 +126,9 @@ jobs:
 
           # Calculate SHA256 checksums
           cd ./artifacts
-          sha256sum * > "${CHECKSUM_FILE}"
+          sha256sum ./* > "${CHECKSUM_FILE}"
           cat "${CHECKSUM_FILE}"
           cd ..
-
 
       # Sign artifacts and SBOMs with Cosign
       - name: Sign artifacts with Cosign
