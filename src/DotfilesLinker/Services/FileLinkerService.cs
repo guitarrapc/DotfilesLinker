@@ -18,7 +18,6 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         "._.DS_Store",     // macOS
         "Thumbs.db",       // Windows
         "Desktop.ini",     // Windows
-        "desktop.ini",     // Windows
         "ehthumbs.db",     // Windows
         "ehthumbs_vista.db", // Windows
 
