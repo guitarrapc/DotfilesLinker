@@ -55,10 +55,23 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="overwrite">Whether to overwrite existing files.</param>
     private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignore, bool overwrite)
     {
-        var files = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false)
-            .Where(p => !ignore.Contains(Path.GetFileName(p)));
+        var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
+        _logger.Verbose($"Total files in repository root: {allFiles.Count}");
 
-        _logger.Info($"Found {files.Count()} files to link from repository root directory to {userHome}");
+        // Log ignored files
+        var ignoredFiles = allFiles.Where(p => ignore.Contains(Path.GetFileName(p))).ToList();
+        if (ignoredFiles.Any())
+        {
+            _logger.Info($"Ignoring {ignoredFiles.Count} files from repository root based on ignore patterns:");
+            foreach (var file in ignoredFiles)
+            {
+                _logger.Verbose($"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
+            }
+        }
+
+        var files = allFiles.Where(p => !ignore.Contains(Path.GetFileName(p))).ToList();
+
+        _logger.Info($"Found {files.Count} files to link from repository root directory to {userHome}");
 
         foreach (var src in files)
         {
@@ -199,9 +212,17 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         var lines = fileSystem.ReadAllLines(ignoreFilePath);
         _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
 
-        return lines
+        var ignoreList = lines
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Select(line => line.Trim())
             .ToHashSet(StringComparer.Ordinal);
+
+        // Debug output for each ignored pattern
+        foreach (var pattern in ignoreList)
+        {
+            _logger.Verbose($"Ignoring pattern: '{pattern}'");
+        }
+
+        return ignoreList;
     }
 }
