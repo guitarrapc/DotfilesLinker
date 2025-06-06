@@ -46,11 +46,17 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="userHome">The user's home directory path.</param>
     /// <param name="ignoreFileName">The name of the ignore file containing patterns to exclude.</param>
     /// <param name="overwrite">Whether to overwrite existing files or directories.</param>
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
     /// <exception cref="InvalidOperationException">
     /// Thrown if a target file or directory already exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    public void LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite)
+    public void LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite, bool dryRun = false)
     {
+        if (dryRun)
+        {
+            _logger.Info("DRY RUN MODE: No files will be actually linked");
+        }
+
         _logger.Info($"Starting to link dotfiles from {repoRoot} to {userHome}");
         _logger.Info($"Using ignore file: {ignoreFileName}");
 
@@ -61,11 +67,18 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         _logger.Verbose($"Using {_defaultIgnorePatterns.Count} default ignore patterns");
 
         // Process each directory
-        ProcessRepositoryRoot(repoRoot, userHome, ignorePatterns, overwrite);
-        ProcessHomeDirectory(repoRoot, userHome, ignorePatterns, overwrite);
-        ProcessRootDirectory(repoRoot, ignorePatterns, overwrite);
+        ProcessRepositoryRoot(repoRoot, userHome, ignorePatterns, overwrite, dryRun);
+        ProcessHomeDirectory(repoRoot, userHome, ignorePatterns, overwrite, dryRun);
+        ProcessRootDirectory(repoRoot, ignorePatterns, overwrite, dryRun);
 
-        _logger.Info("Dotfiles linking completed");
+        if (dryRun)
+        {
+            _logger.Info("DRY RUN COMPLETED: No files were actually linked");
+        }
+        else
+        {
+            _logger.Info("Dotfiles linking completed");
+        }
     }
 
     /*-----------------------------------------------------------
@@ -79,7 +92,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="userHome">The user's home directory path.</param>
     /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite)
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
+    private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
     {
         var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
         _logger.Verbose($"Total files in repository root: {allFiles.Count}");
@@ -117,7 +131,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
             _logger.Verbose($"Linking {src} to {dst}");
-            LinkFile(src, dst, overwrite);
+            LinkFile(src, dst, overwrite, dryRun);
         }
     }
 
@@ -128,9 +142,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="userHome">The user's home directory path.</param>
     /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessHomeDirectory(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite)
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
+    private void ProcessHomeDirectory(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
     {
-        ProcessDirectory(repoRoot, "HOME", userHome, ignorePatterns, overwrite);
+        ProcessDirectory(repoRoot, "HOME", userHome, ignorePatterns, overwrite, dryRun);
     }
 
     /// <summary>
@@ -139,14 +154,15 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessRootDirectory(string repoRoot, HashSet<string> ignorePatterns, bool overwrite)
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
+    private void ProcessRootDirectory(string repoRoot, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
             _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
             return;
         }
-        ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite);
+        ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite, dryRun);
     }
 
     /// <summary>
@@ -157,7 +173,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="destDir">The destination directory path.</param>
     /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, HashSet<string> ignorePatterns, bool overwrite)
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
+    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
     {
         var srcPath = Path.Combine(repoRoot, srcDir);
         if (!fileSystem.DirectoryExists(srcPath))
@@ -205,10 +222,15 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
             var dstDir = Path.GetDirectoryName(dst)!;
             _logger.Verbose($"Ensuring directory exists: {dstDir}");
-            fileSystem.EnsureDirectory(dstDir);
+
+            // Only actually create the directory if not in dry-run mode
+            if (!dryRun)
+            {
+                fileSystem.EnsureDirectory(dstDir);
+            }
 
             _logger.Verbose($"Linking {file} to {dst}");
-            LinkFile(file, dst, overwrite);
+            LinkFile(file, dst, overwrite, dryRun);
         }
     }
 
@@ -218,10 +240,11 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="source">The source file or directory path.</param>
     /// <param name="target">The target file or directory path.</param>
     /// <param name="overwrite">Whether to overwrite the target if it already exists.</param>
+    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
     /// <exception cref="InvalidOperationException">
     /// Thrown if the target exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    private void LinkFile(string source, string target, bool overwrite)
+    private void LinkFile(string source, string target, bool overwrite, bool dryRun)
     {
         bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
 
@@ -232,7 +255,14 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             // If the target is a symlink and points to the same file, do nothing
             if (currentLinkTarget is not null && PathUtilities.PathEquals(currentLinkTarget, source))
             {
-                _logger.Success($"Skipping already linked: {target} -> {source}");
+                if (dryRun)
+                {
+                    _logger.Success($"[DRY-RUN] Would skip already linked: {target} -> {source}");
+                }
+                else
+                {
+                    _logger.Success($"Skipping already linked: {target} -> {source}");
+                }
                 return;
             }
 
@@ -242,22 +272,43 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
                 throw new InvalidOperationException($"'{target}' already exists; use --force=y to overwrite.");
             }
 
-            _logger.Verbose($"Deleting existing target: {target}");
-            fileSystem.Delete(target);
+            if (dryRun)
+            {
+                _logger.Verbose($"[DRY-RUN] Would delete existing target: {target}");
+            }
+            else
+            {
+                _logger.Verbose($"Deleting existing target: {target}");
+                fileSystem.Delete(target);
+            }
         }
 
-        // Create the link
+        // Create the link (or just log what would happen in dry-run mode)
         try
         {
             if (fileSystem.DirectoryExists(source))
             {
-                _logger.Success($"Creating directory symlink: {target} -> {source}");
-                fileSystem.CreateDirectorySymlink(target, source);
+                if (dryRun)
+                {
+                    _logger.Success($"[DRY-RUN] Would create directory symlink: {target} -> {source}");
+                }
+                else
+                {
+                    _logger.Success($"Creating directory symlink: {target} -> {source}");
+                    fileSystem.CreateDirectorySymlink(target, source);
+                }
             }
             else
             {
-                _logger.Success($"Creating file symlink: {target} -> {source}");
-                fileSystem.CreateFileSymlink(target, source);
+                if (dryRun)
+                {
+                    _logger.Success($"[DRY-RUN] Would create file symlink: {target} -> {source}");
+                }
+                else
+                {
+                    _logger.Success($"Creating file symlink: {target} -> {source}");
+                    fileSystem.CreateFileSymlink(target, source);
+                }
             }
         }
         catch (Exception ex)

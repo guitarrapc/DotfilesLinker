@@ -7,6 +7,7 @@ bool showHelp = args.Any(a => a.Equals("--help", StringComparison.OrdinalIgnoreC
 bool showVersion = args.Any(a => a.Equals("--version", StringComparison.OrdinalIgnoreCase));
 bool forceOverwrite = args.Any(a => a.Equals("--force=y", StringComparison.OrdinalIgnoreCase));
 bool verbose = args.Any(a => a.Equals("--verbose", StringComparison.OrdinalIgnoreCase) || a.Equals("-v", StringComparison.OrdinalIgnoreCase));
+bool dryRun = args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase) || a.Equals("-d", StringComparison.OrdinalIgnoreCase));
 
 // display help or version information and exit if requested
 if (showHelp)
@@ -34,13 +35,21 @@ logger.Info($"Execution root: {executionRoot}");
 logger.Info($"User home: {userHome}");
 logger.Info($"Ignore file: {ignoreFileName}");
 logger.Info($"Force overwrite: {forceOverwrite}");
+logger.Info($"Dry run: {dryRun}");
 
 // execute
 try
 {
-    svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, forceOverwrite);
+    svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, forceOverwrite, dryRun);
 
-    logger.Success("All operations completed.");
+    if (dryRun)
+    {
+        logger.Success("Dry run completed successfully. No changes were made.");
+    }
+    else
+    {
+        logger.Success("All operations completed.");
+    }
 }
 catch (UnauthorizedAccessException ex)
 {
@@ -70,8 +79,7 @@ catch (Exception ex)
 
 // Displays help information for the application.
 static void DisplayHelp()
-{
-    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+{    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
     Console.WriteLine($$"""
         Dotfiles Linker - A utility to link dotfiles from a repository to your home directory
 
@@ -82,6 +90,7 @@ static void DisplayHelp()
           --force=y          Overwrite existing files or directories
           --verbose, -v      Display detailed information during execution
           --version          Display version information
+          --dry-run, -d      Simulate the operations without making any changes
 
         Description:
           This utility creates symbolic links from files in the current directory
@@ -105,6 +114,7 @@ static void DisplayHelp()
           {{appName}}              # Link dotfiles using default settings
           {{appName}} --force=y    # Overwrite any existing files
           {{appName}} --verbose    # Show detailed information
+          {{appName}} --dry-run    # Simulate the operations
         """);
 }
 
