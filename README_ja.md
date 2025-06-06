@@ -154,6 +154,19 @@ $ DotfilesLinker --force=y
 [o] All operations completed.
 ```
 
+ドライランモードを使用して、実際に変更を加えずに何が起こるかを確認することもできます：
+
+```sh
+$ DotfilesLinker --dry-run
+DRY RUN MODE: No files will be actually linked
+Starting to link dotfiles from /home/user/dotfiles to /home/user
+Using ignore file: dotfiles_ignore
+[o] [DRY-RUN] Would create file symlink: /home/user/.gitconfig -> /home/user/dotfiles/.gitconfig
+[o] [DRY-RUN] Would create file symlink: /home/user/.config/git/config -> /home/user/dotfiles/HOME/.config/git/config
+DRY RUN COMPLETED: No files were actually linked
+Dry run completed successfully. No changes were made.
+```
+
 3. DotfilesLinkerによって作成されたシンボリックリンクを確認します。
 
 ```sh
@@ -198,6 +211,7 @@ DotfilesLinker --help
 | `--version` | バージョン情報を表示 |
 | `--force=y` | 既存のファイルやディレクトリを上書き |
 | `--verbose`, `-v` | 実行中の詳細情報を表示 |
+| `--dry-run`, `-d` | ファイルシステムに変更を加えずに処理をシミュレーション |
 
 ### 環境変数
 
@@ -237,8 +251,10 @@ LICENSE
 ### 自動除外
 
 以下のファイルやディレクトリは自動的に除外されます：
-- `.git` で始まるディレクトリ（`.github` など）
+- バージョン管理システムのフォルダ（`.git`、`.svn`、`.hg`）
 - ルートディレクトリの非ドットファイル（先頭が `.` でないファイル）
+- OS固有のファイル（macOSの`.DS_Store`、Windowsの`Thumbs.db`など）
+- 一時ファイル（`*.bak`、`*.tmp`、vimのスワップファイルなど）
 
 ## セキュリティ
 

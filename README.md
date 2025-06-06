@@ -154,6 +154,19 @@ $ DotfilesLinker --force=y
 [o] All operations completed.
 ```
 
+You can also use the dry-run mode to see what would happen without making any changes:
+
+```sh
+$ DotfilesLinker --dry-run
+DRY RUN MODE: No files will be actually linked
+Starting to link dotfiles from /home/user/dotfiles to /home/user
+Using ignore file: dotfiles_ignore
+[o] [DRY-RUN] Would create file symlink: /home/user/.gitconfig -> /home/user/dotfiles/.gitconfig
+[o] [DRY-RUN] Would create file symlink: /home/user/.config/git/config -> /home/user/dotfiles/HOME/.config/git/config
+DRY RUN COMPLETED: No files were actually linked
+Dry run completed successfully. No changes were made.
+```
+
 3. Verify the symbolic links created by DotfilesLinker.
 
 ```sh
@@ -198,6 +211,7 @@ All options are optional. The default behavior is to create symbolic links for a
 | `--version` | Display version information |
 | `--force=y` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
+| `--dry-run`, `-d` | Simulate operations without making any changes to the filesystem |
 
 ### Environment Variables
 
@@ -237,8 +251,10 @@ LICENSE
 ### Automatic Exclusions
 
 The following files and directories are automatically excluded:
-- Directories starting with `.git` (like `.github`)
+- Version control system folders (`.git`, `.svn`, `.hg`)
 - Non-dotfiles in the root directory
+- OS-specific files like `.DS_Store` (macOS) and `Thumbs.db` (Windows)
+- Temporary files like `*.bak`, `*.tmp`, and vim swap files
 
 ## Security
 
