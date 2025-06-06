@@ -10,6 +10,31 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 {
     private readonly ILogger _logger = logger ?? new NullLogger();
 
+    // Default patterns to ignore in all directories, common for all platforms
+    private static readonly HashSet<string> _defaultIgnorePatterns = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Common OS specific files
+        ".DS_Store",       // macOS
+        "._.DS_Store",     // macOS
+        "Thumbs.db",       // Windows
+        "Desktop.ini",     // Windows
+        "desktop.ini",     // Windows
+        "ehthumbs.db",     // Windows
+        "ehthumbs_vista.db", // Windows
+
+        // Common backup/temporary files
+        "*~",              // Linux/Unix backup files
+        ".*.swp",          // Vim swap files
+        ".*.swo",          // Vim swap files
+        "*.bak",           // Backup files
+        "*.tmp",           // Temporary files
+
+        // Version control system folders
+        ".git",
+        ".svn",
+        ".hg"
+    };
+
     /*-----------------------------------------------------------
      * public APIs
      *----------------------------------------------------------*/
@@ -31,13 +56,14 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         // Filter files in the root of the repository
         var ignorePath = Path.Combine(repoRoot, ignoreFileName);
-        var ignore = LoadIgnoreList(ignorePath);
-        _logger.Verbose($"Loaded {ignore.Count} ignore patterns from {ignorePath}");
+        var ignorePatterns = LoadIgnoreList(ignorePath);
+        _logger.Verbose($"Loaded {ignorePatterns.Count} user-defined ignore patterns from {ignorePath}");
+        _logger.Verbose($"Using {_defaultIgnorePatterns.Count} default ignore patterns");
 
         // Process each directory
-        ProcessRepositoryRoot(repoRoot, userHome, ignore, overwrite);
-        ProcessHomeDirectory(repoRoot, userHome, overwrite);
-        ProcessRootDirectory(repoRoot, overwrite);
+        ProcessRepositoryRoot(repoRoot, userHome, ignorePatterns, overwrite);
+        ProcessHomeDirectory(repoRoot, userHome, ignorePatterns, overwrite);
+        ProcessRootDirectory(repoRoot, ignorePatterns, overwrite);
 
         _logger.Info("Dotfiles linking completed");
     }
@@ -51,15 +77,31 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
-    /// <param name="ignore">Set of file patterns to ignore.</param>
+    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignore, bool overwrite)
+    private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite)
     {
         var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
         _logger.Verbose($"Total files in repository root: {allFiles.Count}");
 
+        // Filter files based on ignore patterns and default ignore patterns
+        var files = new List<string>();
+        var ignoredFiles = new List<string>();
+
+        foreach (var file in allFiles)
+        {
+            var fileName = Path.GetFileName(file);
+            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            {
+                ignoredFiles.Add(file);
+            }
+            else
+            {
+                files.Add(file);
+            }
+        }
+
         // Log ignored files
-        var ignoredFiles = allFiles.Where(p => ignore.Contains(Path.GetFileName(p))).ToList();
         if (ignoredFiles.Any())
         {
             _logger.Info($"Ignoring {ignoredFiles.Count} files from repository root based on ignore patterns:");
@@ -68,8 +110,6 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
                 _logger.Verbose($"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
             }
         }
-
-        var files = allFiles.Where(p => !ignore.Contains(Path.GetFileName(p))).ToList();
 
         _logger.Info($"Found {files.Count} files to link from repository root directory to {userHome}");
 
@@ -86,35 +126,38 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
+    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessHomeDirectory(string repoRoot, string userHome, bool overwrite)
+    private void ProcessHomeDirectory(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite)
     {
-        ProcessDirectory(repoRoot, "HOME", userHome, overwrite);
+        ProcessDirectory(repoRoot, "HOME", userHome, ignorePatterns, overwrite);
     }
 
     /// <summary>
     /// Processes and links files in the ROOT directory (Linux/macOS only).
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
+    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessRootDirectory(string repoRoot, bool overwrite)
+    private void ProcessRootDirectory(string repoRoot, HashSet<string> ignorePatterns, bool overwrite)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
             _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
             return;
         }
-        ProcessDirectory(repoRoot, "ROOT", "/", overwrite);
+        ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite);
     }
 
     /// <summary>
-    /// Processes and links files in the HOME directory.
+    /// Processes and links files in a specified directory.
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="srcDir">The source directory path.</param>
     /// <param name="destDir">The destination directory path.</param>
+    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
-    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, bool overwrite)
+    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, HashSet<string> ignorePatterns, bool overwrite)
     {
         var srcPath = Path.Combine(repoRoot, srcDir);
         if (!fileSystem.DirectoryExists(srcPath))
@@ -124,7 +167,35 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         }
 
         _logger.Info($"Processing {srcDir} directory: {srcPath}");
-        var files = fileSystem.EnumerateFiles(srcPath, "*", recursive: true).ToList();
+        var allFiles = fileSystem.EnumerateFiles(srcPath, "*", recursive: true).ToList();
+
+        // Filter files based on ignore patterns
+        var files = new List<string>();
+        var ignoredFiles = new List<string>();
+
+        foreach (var file in allFiles)
+        {
+            var fileName = Path.GetFileName(file);
+            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            {
+                ignoredFiles.Add(file);
+            }
+            else
+            {
+                files.Add(file);
+            }
+        }
+
+        // Log ignored files
+        if (ignoredFiles.Any())
+        {
+            _logger.Info($"Ignoring {ignoredFiles.Count} files from {srcDir} directory based on ignore patterns:");
+            foreach (var file in ignoredFiles)
+            {
+                _logger.Verbose($"  Ignored file: {file} (matched ignore pattern)");
+            }
+        }
+
         _logger.Info($"Found {files.Count} files to link from {srcDir} directory to {destDir}");
 
         foreach (var file in files)
@@ -197,6 +268,74 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     }
 
     /// <summary>
+    /// Determines whether a file should be ignored based on patterns.
+    /// </summary>
+    /// <param name="fileName">The name of the file to check.</param>
+    /// <param name="userIgnorePatterns">User-defined patterns to ignore.</param>
+    /// <returns>True if the file should be ignored; otherwise, false.</returns>
+    private bool ShouldIgnoreFile(string fileName, HashSet<string> userIgnorePatterns)
+    {
+        // Check default ignore patterns
+        if (_defaultIgnorePatterns.Contains(fileName))
+        {
+            return true;
+        }
+
+        // Check for wildcards in default ignore patterns
+        foreach (var pattern in _defaultIgnorePatterns)
+        {
+            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            {
+                return true;
+            }
+        }
+
+        // Check user-defined ignore patterns
+        if (userIgnorePatterns.Contains(fileName))
+        {
+            return true;
+        }
+
+        // Check for wildcards in user-defined ignore patterns
+        foreach (var pattern in userIgnorePatterns)
+        {
+            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Simple wildcard matching for file patterns.
+    /// </summary>
+    /// <param name="fileName">The file name to check.</param>
+    /// <param name="pattern">The pattern to match against.</param>
+    /// <returns>True if the file name matches the pattern; otherwise, false.</returns>
+    private static bool IsWildcardMatch(string fileName, string pattern)
+    {
+        // Simple implementation for patterns like "*.bak", ".*.swp"
+        if (pattern.StartsWith("*"))
+        {
+            return fileName.EndsWith(pattern[1..], StringComparison.OrdinalIgnoreCase);
+        }
+        else if (pattern.EndsWith("*"))
+        {
+            return fileName.StartsWith(pattern[..^1], StringComparison.OrdinalIgnoreCase);
+        }
+        else if (pattern.Contains('*'))
+        {
+            var parts = pattern.Split('*');
+            return fileName.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase) &&
+                   fileName.EndsWith(parts[1], StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Loads the ignore list from the specified file.
     /// </summary>
     /// <param name="ignoreFilePath">The path to the ignore file.</param>
@@ -206,7 +345,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         if (!fileSystem.FileExists(ignoreFilePath))
         {
             _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
-            return new(StringComparer.Ordinal);
+            return new(StringComparer.OrdinalIgnoreCase);
         }
 
         var lines = fileSystem.ReadAllLines(ignoreFilePath);
@@ -215,7 +354,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         var ignoreList = lines
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Select(line => line.Trim())
-            .ToHashSet(StringComparer.Ordinal);
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         // Debug output for each ignored pattern
         foreach (var pattern in ignoreList)
