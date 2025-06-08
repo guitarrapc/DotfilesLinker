@@ -183,7 +183,9 @@ public class FileLinkerServiceTests
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, "temp.tmp"), "/repo/temp.tmp");
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, ".vimrc.swp"), "/repo/.vimrc.swp");
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, "script~"), "/repo/script~");
-    }    [Fact]
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldIgnoreDefaultFilesInSubdirectories()
     {
         // Arrange
