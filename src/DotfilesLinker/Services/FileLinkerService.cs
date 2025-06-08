@@ -82,9 +82,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
     /*-----------------------------------------------------------
      * private helpers
-     *----------------------------------------------------------*/
-
-    /// <summary>
+     *----------------------------------------------------------*/    /// <summary>
     /// Processes and links files in the repository root.
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
@@ -104,7 +102,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         foreach (var file in allFiles)
         {
             var fileName = Path.GetFileName(file);
-            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            var relPath = Path.GetRelativePath(repoRoot, file);
+            var isDir = fileSystem.DirectoryExists(file);
+
+            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
             {
                 ignoredFiles.Add(file);
             }
@@ -162,9 +163,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             return;
         }
         ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite, dryRun);
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Processes and links files in a specified directory.
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
@@ -192,7 +191,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         foreach (var file in allFiles)
         {
             var fileName = Path.GetFileName(file);
-            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            var relPath = Path.GetRelativePath(srcPath, file);
+            var isDir = fileSystem.DirectoryExists(file);
+
+            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
             {
                 ignoredFiles.Add(file);
             }
@@ -315,74 +317,127 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             _logger.Error($"Failed to create symlink from {source} to {target}: {ex.Message}");
             throw;
         }
-    }
-
-    /// <summary>
+    }    /// <summary>
     /// Determines whether a file should be ignored based on patterns.
+    /// This is an enhanced version that properly handles negation patterns.
     /// </summary>
-    /// <param name="fileName">The name of the file to check.</param>
+    /// <param name="filePath">The path to the file (relative to the repository root).</param>
+    /// <param name="fileName">The base name of the file.</param>
+    /// <param name="isDir">Whether the path is a directory.</param>
     /// <param name="userIgnorePatterns">User-defined patterns to ignore.</param>
     /// <returns>True if the file should be ignored; otherwise, false.</returns>
-    private bool ShouldIgnoreFile(string fileName, HashSet<string> userIgnorePatterns)
+    private bool ShouldIgnoreFileEnhanced(string filePath, string fileName, bool isDir, HashSet<string> userIgnorePatterns)
     {
-        // Check default ignore patterns
+        // Default state: don't ignore
+        bool shouldIgnore = false;
+
+        // Check default ignore patterns (exact match)
         if (_defaultIgnorePatterns.Contains(fileName))
         {
-            return true;
+            return true; // Always ignore files that match default patterns
         }
 
         // Check for wildcards in default ignore patterns
         foreach (var pattern in _defaultIgnorePatterns)
         {
-            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            if (pattern.Contains('*') || pattern.Contains('?'))
             {
-                return true;
+                // For backward compatibility, we check fileName first
+                if (WildcardMatcher.IsMatch(fileName, pattern))
+                {
+                    return true; // Always ignore files that match default patterns
+                }
             }
         }
 
-        // Check user-defined ignore patterns
-        if (userIgnorePatterns.Contains(fileName))
-        {
-            return true;
-        }
-
-        // Check for wildcards in user-defined ignore patterns
+        // First pass: process non-negation patterns
         foreach (var pattern in userIgnorePatterns)
         {
-            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            // Skip empty patterns and negation patterns for now
+            if (string.IsNullOrEmpty(pattern) || pattern.StartsWith("!"))
             {
-                return true;
+                continue;
+            }
+
+            // Check exact match first
+            if (pattern == fileName)
+            {
+                shouldIgnore = true;
+                continue;
+            }
+
+            // Try with gitignore style matching for path patterns
+            if (pattern.Contains('/') || pattern.Contains("**"))
+            {
+                if (GitignoreMatcher.IsMatch(filePath, pattern, isDir))
+                {
+                    shouldIgnore = true;
+                    continue;
+                }
+            }
+
+            // For simple patterns or backward compatibility, try wildcards
+            if (pattern.Contains('*') || pattern.Contains('?'))
+            {
+                if (WildcardMatcher.IsMatch(fileName, pattern))
+                {
+                    shouldIgnore = true;
+                    continue;
+                }
             }
         }
 
-        return false;
+        // Second pass: process negation patterns (these can override ignore decisions)
+        foreach (var pattern in userIgnorePatterns)
+        {
+            // Only process negation patterns
+            if (!pattern.StartsWith("!"))
+            {
+                continue;
+            }
+
+            // Remove the negation prefix for matching
+            string patternWithoutNegation = pattern.Substring(1);
+
+            // Check if this negation pattern applies to our file
+            bool matches = false;
+
+            // Try with gitignore style matching for path patterns
+            if (patternWithoutNegation.Contains('/') || patternWithoutNegation.Contains("**"))
+            {
+                matches = GitignoreMatcher.IsMatch(filePath, patternWithoutNegation, isDir);
+            }
+            else if (patternWithoutNegation == fileName)
+            {
+                // Exact match
+                matches = true;
+            }
+            else if (patternWithoutNegation.Contains('*') || patternWithoutNegation.Contains('?'))
+            {
+                // Wildcard match
+                matches = WildcardMatcher.IsMatch(fileName, patternWithoutNegation);
+            }
+
+            // If the negation pattern matches, explicitly don't ignore this file
+            if (matches)
+            {
+                shouldIgnore = false;
+            }
+        }
+
+        return shouldIgnore;
     }
 
     /// <summary>
     /// Simple wildcard matching for file patterns.
+    /// This is kept for backward compatibility.
     /// </summary>
     /// <param name="fileName">The file name to check.</param>
     /// <param name="pattern">The pattern to match against.</param>
     /// <returns>True if the file name matches the pattern; otherwise, false.</returns>
     private static bool IsWildcardMatch(string fileName, string pattern)
     {
-        // Simple implementation for patterns like "*.bak", ".*.swp"
-        if (pattern.StartsWith("*"))
-        {
-            return fileName.EndsWith(pattern[1..], StringComparison.OrdinalIgnoreCase);
-        }
-        else if (pattern.EndsWith("*"))
-        {
-            return fileName.StartsWith(pattern[..^1], StringComparison.OrdinalIgnoreCase);
-        }
-        else if (pattern.Contains('*'))
-        {
-            var parts = pattern.Split('*');
-            return fileName.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase) &&
-                   fileName.EndsWith(parts[1], StringComparison.OrdinalIgnoreCase);
-        }
-
-        return false;
+        return WildcardMatcher.IsMatch(fileName, pattern);
     }
 
     /// <summary>
