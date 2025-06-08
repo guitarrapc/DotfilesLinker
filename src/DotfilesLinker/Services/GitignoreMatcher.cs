@@ -13,11 +13,6 @@ public static class GitignoreMatcher
     private readonly struct GitIgnorePattern
     {
         /// <summary>
-        /// The raw pattern string (trimmed).
-        /// </summary>
-        public readonly string Raw;
-
-        /// <summary>
         /// Whether the pattern is a negation pattern (starts with !).
         /// </summary>
         public readonly bool Negation;
@@ -62,7 +57,6 @@ public static class GitignoreMatcher
                 pattern = pattern.Substring(1);
             }
 
-            Raw = pattern;
             Segments = pattern.Split('/');
         }
     }
