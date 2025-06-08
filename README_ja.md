@@ -272,7 +272,7 @@ backup.???
 docs/build/
 config/local_*.json
 HOME/**.log
-`**/temp/
+**/temp/
 
 # 否定パターン
 # `!`で始まるパターンで、通常なら無視されるファイルを明示的に含める

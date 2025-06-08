@@ -29,7 +29,7 @@ public static class WildcardMatcher
     }
 
     /// <summary>
-    /// Recursive helper function for pattern matching.
+    /// Dynamic programming based pattern matching that handles wildcards.
     /// </summary>
     /// <param name="text">The text to match.</param>
     /// <param name="pattern">The pattern to match against.</param>
@@ -38,40 +38,46 @@ public static class WildcardMatcher
     /// <returns>True if the remaining text matches the remaining pattern; otherwise, false.</returns>
     private static bool MatchPattern(string text, string pattern, int textIndex, int patternIndex)
     {
+        // For '*': since '*' can match zero or more characters, `dp[i][j] = dp[i-1][j] || dp[i][j-1]`
+        // For '?': since '?' matches any single character, `dp[i][j] = dp[i-1][j-1]`
+        // For a regular character: the characters must match and the preceding pattern must also match, so `dp[i][j] = dp[i-1][j-1] && text[i-1] == pattern[j-1]`
+
         int textLength = text.Length;
         int patternLength = pattern.Length;
 
-        // Base case: if we've reached the end of both strings, we have a match
-        if (textIndex == textLength && patternIndex == patternLength)
+        // Create a DP table
+        bool[,] dp = new bool[textLength + 1, patternLength + 1];
+        dp[0, 0] = true; // Empty text matches empty pattern
+
+        // Handle patterns with leading '*'
+        for (int j = 1; j <= patternLength; j++)
         {
-            return true;
+            if (pattern[j - 1] == '*')
+            {
+                dp[0, j] = dp[0, j - 1];
+            }
         }
 
-        // If we've reached the end of the pattern but not the text, no match
-        if (patternIndex == patternLength)
+        // Fill the DP table
+        for (int i = 1; i <= textLength; i++)
         {
-            return false;
+            for (int j = 1; j <= patternLength; j++)
+            {
+                if (pattern[j - 1] == '*')
+                {
+                    dp[i, j] = dp[i - 1, j] || dp[i, j - 1];
+                }
+                else if (pattern[j - 1] == '?')
+                {
+                    dp[i, j] = dp[i - 1, j - 1];
+                }
+                else
+                {
+                    dp[i, j] = dp[i - 1, j - 1] && text[i - 1] == pattern[j - 1];
+                }
+            }
         }
 
-        // Handle current pattern character
-        switch (pattern[patternIndex])
-        {
-            case '*':
-                // Try to match zero or more characters
-                // 1) Skip the asterisk and try to match the rest of the pattern with the current text position
-                // 2) Match one character and try again with the same pattern
-                return MatchPattern(text, pattern, textIndex, patternIndex + 1) ||
-                       (textIndex < textLength && MatchPattern(text, pattern, textIndex + 1, patternIndex));
-
-            case '?':
-                // Match exactly one character
-                return textIndex < textLength && MatchPattern(text, pattern, textIndex + 1, patternIndex + 1);
-
-            default:
-                // Match exact character
-                return textIndex < textLength &&
-                       pattern[patternIndex] == text[textIndex] &&
-                       MatchPattern(text, pattern, textIndex + 1, patternIndex + 1);
-        }
+        return dp[textLength, patternLength];
     }
 }
