@@ -1,5 +1,8 @@
 - チャットのやり取りは日本語で行います。
 - コードは公開するため、コード中のコメントは英語ベースにします。
-- C#はTargetFrameworkで利用できる最新の記法を用います。
 - C#のコードはdotnet formatでフォーマットします。
 - GitHub Actionsは、actionlintやghalintを用いてLintを行います。
+- C#はTargetFrameworkで利用できる最新の記法を用います。
+- C#として、classじゃなくてstructのほうがいいか、init only propertyがいいかなど最新の言語機能を生かすことを検討してください。
+- C#のコードを実装した場合ビルドが通るか`dotnet build`で検証します。
+- C#のコードを実装したら、それに対応するテストコードも実装してください。テストは`dotnet test`で実行して、テストが通ることを確認してください。
