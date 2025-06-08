@@ -1,6 +1,4 @@
-using System.IO;
-using System.Collections.Generic;
-using System.Linq;
+﻿using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Services;
 
@@ -87,8 +85,14 @@ public static class GitignoreMatcher
             return false;
         }
 
-        // Convert path to use forward slashes
-        path = path.Replace('\\', '/');
+        // Ensure path uses forward slashes
+        path = PathUtilities.NormalizePathForPatternMatching(path);
+
+        // Remove any leading / for consistency
+        if (path.StartsWith("/"))
+        {
+            path = path.Substring(1);
+        }
 
         // Split path into segments
         var pathSegs = path.Split('/');

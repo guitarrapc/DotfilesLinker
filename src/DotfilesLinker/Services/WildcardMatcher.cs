@@ -1,6 +1,4 @@
-using System.IO;
-
-namespace DotfilesLinker.Services;
+﻿namespace DotfilesLinker.Services;
 
 /// <summary>
 /// Provides advanced wildcard pattern matching functionality.
@@ -27,11 +25,7 @@ public static class WildcardMatcher
         }
 
         // Case insensitive comparison
-        return MatchPattern(
-            text.ToLowerInvariant(),
-            pattern.ToLowerInvariant(),
-            0,
-            0);
+        return MatchPattern(text.ToLowerInvariant(), pattern.ToLowerInvariant(), 0, 0);
     }
 
     /// <summary>

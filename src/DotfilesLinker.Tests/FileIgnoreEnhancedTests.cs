@@ -16,21 +16,23 @@ public class FileIgnoreEnhancedTests
         _service = new FileLinkerService(_fileSystemMock, _loggerMock);
     }
 
-    // We need to test the private method ShouldIgnoreFileEnhanced
-    // Since it's private, we'll use the public LinkDotfiles method and verify the behavior    [Fact]
     [Fact]
     public void LinkDotfiles_IgnoresDefaultPatterns()
     {
+        // We need to test the private method ShouldIgnoreFileEnhanced
+        // Since it's private, we'll use the public LinkDotfiles method and verify the behavior
+
         // Arrange
-        string repoRoot = @"C:\repo";
-        string userHome = @"C:\home";
+        string repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
+        string userHome = Path.Combine(Path.DirectorySeparatorChar.ToString(), "home");
         string ignoreFileName = ".linkignore";
         bool overwrite = false;
         bool dryRun = true;
 
         // Setup mock to return .DS_Store file in repository root
+        string dsStorePath = Path.Combine(repoRoot, ".DS_Store");
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false)
-            .Returns(new[] { @"C:\repo\.DS_Store" });
+            .Returns(new[] { dsStorePath });
 
         _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
             .Returns(false);
@@ -46,15 +48,17 @@ public class FileIgnoreEnhancedTests
     public void LinkDotfiles_IgnoresNegationPatterns()
     {
         // Arrange
-        string repoRoot = @"C:\repo";
-        string userHome = @"C:\home";
+        string repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
+        string userHome = Path.Combine(Path.DirectorySeparatorChar.ToString(), "home");
         string ignoreFileName = ".linkignore";
         bool overwrite = false;
         bool dryRun = true;
 
         // Setup mock to return .bashrc and .vimrc files in repository root
+        string bashrcPath = Path.Combine(repoRoot, ".bashrc");
+        string vimrcPath = Path.Combine(repoRoot, ".vimrc");
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false)
-            .Returns(new[] { @"C:\repo\.bashrc", @"C:\repo\.vimrc" });
+            .Returns(new[] { bashrcPath, vimrcPath });
 
         // Setup ignore file with pattern that ignores all dot files but includes .vimrc
         _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
@@ -74,9 +78,9 @@ public class FileIgnoreEnhancedTests
     public void LinkDotfiles_IgnoresGitignoreStylePatterns()
     {
         // Arrange
-        string repoRoot = @"C:\repo";
+        string repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
         string homeDir = Path.Combine(repoRoot, "HOME");
-        string userHome = @"C:\home";
+        string userHome = Path.Combine(Path.DirectorySeparatorChar.ToString(), "home");
         string ignoreFileName = ".linkignore";
         bool overwrite = false;
         bool dryRun = true;

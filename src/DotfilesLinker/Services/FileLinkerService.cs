@@ -163,7 +163,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             return;
         }
         ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite, dryRun);
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Processes and links files in a specified directory.
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
@@ -247,8 +249,11 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </exception>
     private void LinkFile(string source, string target, bool overwrite, bool dryRun)
     {
-        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
+        // Normalize paths for cross-platform consistency in logs
+        string normalizedSource = PathUtilities.NormalizePath(source);
+        string normalizedTarget = PathUtilities.NormalizePath(target);
 
+        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
         if (exists)
         {
             var currentLinkTarget = fileSystem.GetLinkTarget(target);
@@ -258,28 +263,28 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would skip already linked: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Skipping already linked: {target} -> {source}");
+                    _logger.Success($"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
                 }
                 return;
             }
 
             if (!overwrite)
             {
-                _logger.Verbose($"Target {target} exists and overwrite=false, aborting");
-                throw new InvalidOperationException($"'{target}' already exists; use --force=y to overwrite.");
+                _logger.Verbose($"Target {normalizedTarget} exists and overwrite=false, aborting");
+                throw new InvalidOperationException($"'{normalizedTarget}' already exists; use --force=y to overwrite.");
             }
 
             if (dryRun)
             {
-                _logger.Verbose($"[DRY-RUN] Would delete existing target: {target}");
+                _logger.Verbose($"[DRY-RUN] Would delete existing target: {normalizedTarget}");
             }
             else
             {
-                _logger.Verbose($"Deleting existing target: {target}");
+                _logger.Verbose($"Deleting existing target: {normalizedTarget}");
                 fileSystem.Delete(target);
             }
         }
@@ -291,11 +296,11 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would create directory symlink: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Creating directory symlink: {target} -> {source}");
+                    _logger.Success($"Creating directory symlink: {normalizedTarget} -> {normalizedSource}");
                     fileSystem.CreateDirectorySymlink(target, source);
                 }
             }
@@ -303,21 +308,23 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would create file symlink: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Creating file symlink: {target} -> {source}");
+                    _logger.Success($"Creating file symlink: {normalizedTarget} -> {normalizedSource}");
                     fileSystem.CreateFileSymlink(target, source);
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.Error($"Failed to create symlink from {source} to {target}: {ex.Message}");
+            _logger.Error($"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
             throw;
         }
-    }    /// <summary>
+    }
+
+    /// <summary>
     /// Determines whether a file should be ignored based on patterns.
     /// This is an enhanced version that properly handles negation patterns.
     /// </summary>
@@ -330,6 +337,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     {
         // Default state: don't ignore
         bool shouldIgnore = false;
+
+        // Normalize path for cross-platform compatibility
+        filePath = PathUtilities.NormalizePathForPatternMatching(filePath);
 
         // Check default ignore patterns (exact match)
         if (_defaultIgnorePatterns.Contains(fileName))
@@ -358,18 +368,20 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 continue;
             }
+            // Normalize pattern for cross-platform compatibility
+            string normalizedPattern = PathUtilities.NormalizePathForPatternMatching(pattern);
 
             // Check exact match first
-            if (pattern == fileName)
+            if (normalizedPattern == fileName)
             {
                 shouldIgnore = true;
                 continue;
             }
 
             // Try with gitignore style matching for path patterns
-            if (pattern.Contains('/') || pattern.Contains("**"))
+            if (normalizedPattern.Contains('/') || normalizedPattern.Contains("**"))
             {
-                if (GitignoreMatcher.IsMatch(filePath, pattern, isDir))
+                if (GitignoreMatcher.IsMatch(filePath, normalizedPattern, isDir))
                 {
                     shouldIgnore = true;
                     continue;
@@ -377,9 +389,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             }
 
             // For simple patterns or backward compatibility, try wildcards
-            if (pattern.Contains('*') || pattern.Contains('?'))
+            if (normalizedPattern.Contains('*') || normalizedPattern.Contains('?'))
             {
-                if (WildcardMatcher.IsMatch(fileName, pattern))
+                if (WildcardMatcher.IsMatch(fileName, normalizedPattern))
                 {
                     shouldIgnore = true;
                     continue;
@@ -398,6 +410,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
             // Remove the negation prefix for matching
             string patternWithoutNegation = pattern.Substring(1);
+            // Normalize pattern for cross-platform compatibility
+            patternWithoutNegation = PathUtilities.NormalizePathForPatternMatching(patternWithoutNegation);
 
             // Check if this negation pattern applies to our file
             bool matches = false;
@@ -426,18 +440,6 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         }
 
         return shouldIgnore;
-    }
-
-    /// <summary>
-    /// Simple wildcard matching for file patterns.
-    /// This is kept for backward compatibility.
-    /// </summary>
-    /// <param name="fileName">The file name to check.</param>
-    /// <param name="pattern">The pattern to match against.</param>
-    /// <returns>True if the file name matches the pattern; otherwise, false.</returns>
-    private static bool IsWildcardMatch(string fileName, string pattern)
-    {
-        return WildcardMatcher.IsMatch(fileName, pattern);
     }
 
     /// <summary>
