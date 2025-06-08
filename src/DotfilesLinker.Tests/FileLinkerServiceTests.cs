@@ -208,7 +208,8 @@ public class FileLinkerServiceTests
         // Mock GetRelativePath behavior
         _fileSystemMock.When(fs =>
             fs.CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(callInfo => {
+            .Do(callInfo =>
+            {
                 // Just capture the call but don't do anything
             });
 
@@ -217,7 +218,7 @@ public class FileLinkerServiceTests
 
         // Assert
         // Verify that CreateFileSymlink was called only once and only for the non-OS specific file
-        _fileSystemMock.Received(1).CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/.config/file1");        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/.config/.DS_Store");
+        _fileSystemMock.Received(1).CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/.config/file1"); _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/.config/.DS_Store");
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/Documents/Thumbs.db");
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), "/repo/HOME/Scripts/script~");
     }

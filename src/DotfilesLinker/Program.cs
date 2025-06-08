@@ -79,7 +79,8 @@ catch (Exception ex)
 
 // Displays help information for the application.
 static void DisplayHelp()
-{    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+{
+    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
     Console.WriteLine($$"""
         Dotfiles Linker - A utility to link dotfiles from a repository to your home directory
 
