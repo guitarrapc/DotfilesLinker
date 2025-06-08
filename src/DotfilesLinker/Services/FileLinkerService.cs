@@ -82,7 +82,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
     /*-----------------------------------------------------------
      * private helpers
-     *----------------------------------------------------------*/    /// <summary>
+     *----------------------------------------------------------*/
+    /// <summary>
     /// Processes and links files in the repository root.
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
