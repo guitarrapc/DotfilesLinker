@@ -1,12 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DotfilesLinker.Infrastructure;
+﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
-using NSubstitute;
-using Xunit;
 
 namespace DotfilesLinker.Tests;
 

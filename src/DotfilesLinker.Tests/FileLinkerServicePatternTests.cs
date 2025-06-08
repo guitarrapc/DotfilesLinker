@@ -1,6 +1,5 @@
-using DotfilesLinker.Infrastructure;
+﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
-using NSubstitute;
 using System.Reflection;
 
 namespace DotfilesLinker.Tests;
