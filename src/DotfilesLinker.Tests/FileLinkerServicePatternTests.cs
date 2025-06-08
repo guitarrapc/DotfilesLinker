@@ -1,6 +1,5 @@
-using DotfilesLinker.Infrastructure;
+﻿using DotfilesLinker.Infrastructure;
 using DotfilesLinker.Services;
-using NSubstitute;
 using System.Reflection;
 
 namespace DotfilesLinker.Tests;
@@ -121,23 +120,18 @@ public class FileLinkerServicePatternTests
 
         // Assert
         Assert.Equal(expectedResult, result);
-    }
-
-    // Helper method to invoke the private ShouldIgnoreFile method via reflection
+    }    // Helper method to invoke the private ShouldIgnoreFileEnhanced method via reflection
     private bool InvokeShouldIgnoreFile(string fileName, HashSet<string> userIgnorePatterns)
     {
-        var methodInfo = typeof(FileLinkerService).GetMethod("ShouldIgnoreFile",
+        var methodInfo = typeof(FileLinkerService).GetMethod("ShouldIgnoreFileEnhanced",
             BindingFlags.NonPublic | BindingFlags.Instance);
 
-        return (bool)methodInfo!.Invoke(_service, new object[] { fileName, userIgnorePatterns })!;
-    }
-
-    // Helper method to invoke the private IsWildcardMatch method via reflection
+        // The new method requires more parameters: filePath, fileName, isDir, userIgnorePatterns
+        // For tests, we'll use fileName as filePath and set isDir to false
+        return (bool)methodInfo!.Invoke(_service, new object[] { fileName, fileName, false, userIgnorePatterns })!;
+    }    // Helper method to invoke the WildcardMatcher.IsMatch method
     private bool InvokeIsWildcardMatch(string fileName, string pattern)
     {
-        var methodInfo = typeof(FileLinkerService).GetMethod("IsWildcardMatch",
-            BindingFlags.NonPublic | BindingFlags.Static);
-
-        return (bool)methodInfo!.Invoke(null, new object[] { fileName, pattern })!;
+        return WildcardMatcher.IsMatch(fileName, pattern);
     }
 }

@@ -83,7 +83,6 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /*-----------------------------------------------------------
      * private helpers
      *----------------------------------------------------------*/
-
     /// <summary>
     /// Processes and links files in the repository root.
     /// </summary>
@@ -104,7 +103,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         foreach (var file in allFiles)
         {
             var fileName = Path.GetFileName(file);
-            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            var relPath = Path.GetRelativePath(repoRoot, file);
+            var isDir = fileSystem.DirectoryExists(file);
+
+            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
             {
                 ignoredFiles.Add(file);
             }
@@ -192,7 +194,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         foreach (var file in allFiles)
         {
             var fileName = Path.GetFileName(file);
-            if (ShouldIgnoreFile(fileName, ignorePatterns))
+            var relPath = Path.GetRelativePath(srcPath, file);
+            var isDir = fileSystem.DirectoryExists(file);
+
+            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
             {
                 ignoredFiles.Add(file);
             }
@@ -245,8 +250,11 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </exception>
     private void LinkFile(string source, string target, bool overwrite, bool dryRun)
     {
-        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
+        // Normalize paths for cross-platform consistency in logs
+        string normalizedSource = PathUtilities.NormalizePath(source);
+        string normalizedTarget = PathUtilities.NormalizePath(target);
 
+        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
         if (exists)
         {
             var currentLinkTarget = fileSystem.GetLinkTarget(target);
@@ -256,28 +264,28 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would skip already linked: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Skipping already linked: {target} -> {source}");
+                    _logger.Success($"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
                 }
                 return;
             }
 
             if (!overwrite)
             {
-                _logger.Verbose($"Target {target} exists and overwrite=false, aborting");
-                throw new InvalidOperationException($"'{target}' already exists; use --force=y to overwrite.");
+                _logger.Verbose($"Target {normalizedTarget} exists and overwrite=false, aborting");
+                throw new InvalidOperationException($"'{normalizedTarget}' already exists; use --force=y to overwrite.");
             }
 
             if (dryRun)
             {
-                _logger.Verbose($"[DRY-RUN] Would delete existing target: {target}");
+                _logger.Verbose($"[DRY-RUN] Would delete existing target: {normalizedTarget}");
             }
             else
             {
-                _logger.Verbose($"Deleting existing target: {target}");
+                _logger.Verbose($"Deleting existing target: {normalizedTarget}");
                 fileSystem.Delete(target);
             }
         }
@@ -289,11 +297,11 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would create directory symlink: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Creating directory symlink: {target} -> {source}");
+                    _logger.Success($"Creating directory symlink: {normalizedTarget} -> {normalizedSource}");
                     fileSystem.CreateDirectorySymlink(target, source);
                 }
             }
@@ -301,88 +309,138 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             {
                 if (dryRun)
                 {
-                    _logger.Success($"[DRY-RUN] Would create file symlink: {target} -> {source}");
+                    _logger.Success($"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
                 }
                 else
                 {
-                    _logger.Success($"Creating file symlink: {target} -> {source}");
+                    _logger.Success($"Creating file symlink: {normalizedTarget} -> {normalizedSource}");
                     fileSystem.CreateFileSymlink(target, source);
                 }
             }
         }
         catch (Exception ex)
         {
-            _logger.Error($"Failed to create symlink from {source} to {target}: {ex.Message}");
+            _logger.Error($"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
             throw;
         }
     }
 
     /// <summary>
     /// Determines whether a file should be ignored based on patterns.
+    /// This is an enhanced version that properly handles negation patterns.
     /// </summary>
-    /// <param name="fileName">The name of the file to check.</param>
+    /// <param name="filePath">The path to the file (relative to the repository root).</param>
+    /// <param name="fileName">The base name of the file.</param>
+    /// <param name="isDir">Whether the path is a directory.</param>
     /// <param name="userIgnorePatterns">User-defined patterns to ignore.</param>
     /// <returns>True if the file should be ignored; otherwise, false.</returns>
-    private bool ShouldIgnoreFile(string fileName, HashSet<string> userIgnorePatterns)
+    private bool ShouldIgnoreFileEnhanced(string filePath, string fileName, bool isDir, HashSet<string> userIgnorePatterns)
     {
-        // Check default ignore patterns
+        // Default state: don't ignore
+        bool shouldIgnore = false;
+
+        // Normalize path for cross-platform compatibility
+        filePath = PathUtilities.NormalizePathForPatternMatching(filePath);
+
+        // Check default ignore patterns (exact match)
         if (_defaultIgnorePatterns.Contains(fileName))
         {
-            return true;
+            return true; // Always ignore files that match default patterns
         }
 
         // Check for wildcards in default ignore patterns
         foreach (var pattern in _defaultIgnorePatterns)
         {
-            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            if (pattern.Contains('*') || pattern.Contains('?'))
             {
-                return true;
+                // For backward compatibility, we check fileName first
+                if (WildcardMatcher.IsMatch(fileName, pattern))
+                {
+                    return true; // Always ignore files that match default patterns
+                }
             }
         }
 
-        // Check user-defined ignore patterns
-        if (userIgnorePatterns.Contains(fileName))
-        {
-            return true;
-        }
-
-        // Check for wildcards in user-defined ignore patterns
+        // First pass: process non-negation patterns
         foreach (var pattern in userIgnorePatterns)
         {
-            if (pattern.Contains('*') && IsWildcardMatch(fileName, pattern))
+            // Skip empty patterns and negation patterns for now
+            if (string.IsNullOrEmpty(pattern) || pattern.StartsWith("!"))
             {
-                return true;
+                continue;
+            }
+            // Normalize pattern for cross-platform compatibility
+            string normalizedPattern = PathUtilities.NormalizePathForPatternMatching(pattern);
+
+            // Check exact match first
+            if (normalizedPattern == fileName)
+            {
+                shouldIgnore = true;
+                continue;
+            }
+
+            // Try with gitignore style matching for path patterns
+            if (normalizedPattern.Contains('/') || normalizedPattern.Contains("**"))
+            {
+                if (GitignoreMatcher.IsMatch(filePath, normalizedPattern, isDir))
+                {
+                    shouldIgnore = true;
+                    continue;
+                }
+            }
+
+            // For simple patterns or backward compatibility, try wildcards
+            if (normalizedPattern.Contains('*') || normalizedPattern.Contains('?'))
+            {
+                if (WildcardMatcher.IsMatch(fileName, normalizedPattern))
+                {
+                    shouldIgnore = true;
+                    continue;
+                }
             }
         }
 
-        return false;
-    }
+        // Second pass: process negation patterns (these can override ignore decisions)
+        foreach (var pattern in userIgnorePatterns)
+        {
+            // Only process negation patterns
+            if (!pattern.StartsWith("!"))
+            {
+                continue;
+            }
 
-    /// <summary>
-    /// Simple wildcard matching for file patterns.
-    /// </summary>
-    /// <param name="fileName">The file name to check.</param>
-    /// <param name="pattern">The pattern to match against.</param>
-    /// <returns>True if the file name matches the pattern; otherwise, false.</returns>
-    private static bool IsWildcardMatch(string fileName, string pattern)
-    {
-        // Simple implementation for patterns like "*.bak", ".*.swp"
-        if (pattern.StartsWith("*"))
-        {
-            return fileName.EndsWith(pattern[1..], StringComparison.OrdinalIgnoreCase);
-        }
-        else if (pattern.EndsWith("*"))
-        {
-            return fileName.StartsWith(pattern[..^1], StringComparison.OrdinalIgnoreCase);
-        }
-        else if (pattern.Contains('*'))
-        {
-            var parts = pattern.Split('*');
-            return fileName.StartsWith(parts[0], StringComparison.OrdinalIgnoreCase) &&
-                   fileName.EndsWith(parts[1], StringComparison.OrdinalIgnoreCase);
+            // Remove the negation prefix for matching
+            string patternWithoutNegation = pattern.Substring(1);
+            // Normalize pattern for cross-platform compatibility
+            patternWithoutNegation = PathUtilities.NormalizePathForPatternMatching(patternWithoutNegation);
+
+            // Check if this negation pattern applies to our file
+            bool matches = false;
+
+            // Try with gitignore style matching for path patterns
+            if (patternWithoutNegation.Contains('/') || patternWithoutNegation.Contains("**"))
+            {
+                matches = GitignoreMatcher.IsMatch(filePath, patternWithoutNegation, isDir);
+            }
+            else if (patternWithoutNegation == fileName)
+            {
+                // Exact match
+                matches = true;
+            }
+            else if (patternWithoutNegation.Contains('*') || patternWithoutNegation.Contains('?'))
+            {
+                // Wildcard match
+                matches = WildcardMatcher.IsMatch(fileName, patternWithoutNegation);
+            }
+
+            // If the negation pattern matches, explicitly don't ignore this file
+            if (matches)
+            {
+                shouldIgnore = false;
+            }
         }
 
-        return false;
+        return shouldIgnore;
     }
 
     /// <summary>

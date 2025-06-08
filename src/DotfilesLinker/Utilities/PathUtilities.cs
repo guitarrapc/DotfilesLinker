@@ -1,4 +1,6 @@
-﻿namespace DotfilesLinker.Utilities;
+﻿using System.Runtime.CompilerServices;
+
+namespace DotfilesLinker.Utilities;
 
 /// <summary>
 /// Provides utility methods for working with file and directory paths.
@@ -23,5 +25,32 @@ public static class PathUtilities
             return false;
 
         return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Normalizes a path for consistent display across platforms.
+    /// </summary>
+    /// <param name="path">The path to normalize.</param>
+    /// <returns>A normalized path string.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static string NormalizePath(string path)
+    {
+        // Use platform-specific path separator for display
+        return OperatingSystem.IsWindows()
+            ? path.Replace('/', '\\')
+            : path.Replace('\\', '/');
+    }
+
+    /// <summary>
+    /// Normalizes a path string for pattern matching.
+    /// Always converts to forward slashes for consistent pattern matching across platforms.
+    /// </summary>
+    /// <param name="path">The path to normalize.</param>
+    /// <returns>A normalized path with forward slashes.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static string NormalizePathForPatternMatching(string path)
+    {
+        // Always use forward slashes for pattern matching
+        return path.Replace('\\', '/');
     }
 }

@@ -238,7 +238,7 @@ DotfilesLinker --force=y
 
 ### dotfiles_ignore File
 
-You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file:
+You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file. DotfilesLinker supports several pattern types for flexible file exclusion:
 
 ```
 # Example dotfiles_ignore
@@ -247,6 +247,48 @@ You can specify files or directories to be excluded from linking in the `dotfile
 README.md
 LICENSE
 ```
+
+#### Supported Pattern Types
+
+DotfilesLinker supports the following pattern types in the `dotfiles_ignore` file:
+
+```
+# Simple filenames or paths that match exactly
+.github
+README.md
+LICENSE
+
+# Wildcard patterns
+# `*` matches any string (excluding path separators)
+# `?` matches any single character
+*.log
+temp*
+backup.???
+
+# Gitignore-style patterns
+# A pattern containing `/` matches a specific path from the repository root
+# `**` matches any number of directories (including zero)
+# A pattern ending with `/` matches directories only
+docs/build/
+config/local_*.json
+HOME/**.log
+**/temp/
+
+# Negation patterns
+# A pattern starting with `!` explicitly includes files that would otherwise be ignored
+# Processed after non-negated patterns
+# --------------------------
+# Patterns are processed in two stages:
+# 1. First, all non-negation patterns are evaluated
+# 2. Then, negation patterns (`!`) are applied and can override previous exclusions
+## Exclude all .log files except important.log
+*.log
+!important.log
+## Exclude everything in docs except README.md
+docs/
+!docs/README.md
+```
+
 
 ### Automatic Exclusions
 

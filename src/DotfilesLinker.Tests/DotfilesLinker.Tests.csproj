@@ -6,7 +6,6 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="GitHubActionsTestLogger" Version="2.4.1">
@@ -21,10 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DotfilesLinker\DotfilesLinker.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>
