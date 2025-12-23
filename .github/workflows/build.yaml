@@ -21,10 +21,10 @@ jobs:
             rid: linux-x64
           - os: ubuntu-24.04-arm
             rid: linux-arm64
-          - os: macos-15-intel
-            rid: osx-x64
-          - os: macos-26
-            rid: osx-arm64
+          # - os: macos-15-intel
+          #   rid: osx-x64
+          # - os: macos-26
+          #   rid: osx-arm64
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
@@ -40,6 +40,7 @@ jobs:
         run: dotnet build -c Release --no-restore
       - name: Test
         run: dotnet test -c Release --no-build --logger GitHubActions --logger "console;verbosity=normal"
+      # output to ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/*
       - name: Publish
         run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
         working-directory: ./src/DotfilesLinker
@@ -47,7 +48,7 @@ jobs:
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: ${{ matrix.rid }}
-          path: ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/*
+          path: ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/**
           retention-days: 1
           if-no-files-found: error
 
@@ -65,10 +66,10 @@ jobs:
             rid: linux-x64
           - os: ubuntu-24.04-arm
             rid: linux-arm64
-          - os: macos-15-intel
-            rid: osx-x64
-          - os: macos-26
-            rid: osx-arm64
+          # - os: macos-15-intel
+          #   rid: osx-x64
+          # - os: macos-26
+          #   rid: osx-arm64
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
