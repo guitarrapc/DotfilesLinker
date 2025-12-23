@@ -35,13 +35,17 @@ jobs:
           persist-credentials: false
       - uses: guitarrapc/actions/.github/actions/setup-dotnet@main
       - name: Restore dependencies
+        shell: bash
         run: dotnet restore
       - name: Build
+        shell: bash
         run: dotnet build -c Release --no-restore
       - name: Test
+        shell: bash
         run: dotnet test -c Release --no-build --logger GitHubActions --logger "console;verbosity=normal"
       # output to ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/*
       - name: Publish
+        shell: bash
         run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
         working-directory: ./src/DotfilesLinker
       - name: Upload artifact
@@ -80,11 +84,23 @@ jobs:
         with:
           path: ./artifacts
           merge-multiple: true
-      - name: Execute published binary without runtime
+      - name: List artifacts
+        shell: bash
         run: |
-          ls -lR ./artifacts/
-          ${{ github.workspace }}/artifacts/release_${{ matrix.rid }}/DotfilesLinker --version
-          ${{ github.workspace }}/artifacts/release_${{ matrix.rid }}/DotfilesLinker --help
+          echo "Downloaded artifacts:"
+          find ./artifacts -type f | sort
+
+          # Ensure we have artifacts to release
+          if [ -z "$(find ./artifacts/release_${{ matrix.rid }} -type f)" ]; then
+            echo "::error::No artifacts found. Aborting release creation."
+            exit 1
+          fi
+      - name: Execute published binary without runtime
+        shell: bash
+        run: |
+          chmod +x ./artifacts/release_${{ matrix.rid }}/DotfilesLinker || true
+          ./artifacts/release_${{ matrix.rid }}/DotfilesLinker --version
+          ./artifacts/release_${{ matrix.rid }}/DotfilesLinker --help
 
   # marker job to target PR status check
   build:
