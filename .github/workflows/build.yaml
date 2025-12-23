@@ -13,18 +13,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - os: windows-2025
-          #   rid: win-x64
-          # - os: windows-11-arm
-          #   rid: win-arm64
+          - os: windows-2025
+            rid: win-x64
+          - os: windows-11-arm
+            rid: win-arm64
           - os: ubuntu-24.04
             rid: linux-x64
           - os: ubuntu-24.04-arm
             rid: linux-arm64
-          # - os: macos-15-intel
-          #   rid: osx-x64
-          # - os: macos-26
-          #   rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-26
+            rid: osx-arm64
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
@@ -62,18 +62,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # - os: windows-2025
-          #   rid: win-x64
-          # - os: windows-11-arm
-          #   rid: win-arm64
+          - os: windows-2025
+            rid: win-x64
+          - os: windows-11-arm
+            rid: win-arm64
           - os: ubuntu-24.04
             rid: linux-x64
           - os: ubuntu-24.04-arm
             rid: linux-arm64
-          # - os: macos-15-intel
-          #   rid: osx-x64
-          # - os: macos-26
-          #   rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-26
+            rid: osx-arm64
     permissions:
       contents: read
     runs-on: ${{ matrix.os }}
