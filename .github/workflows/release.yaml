@@ -53,6 +53,7 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version="${TAG}" --artifacts-path ./artifacts
+        working-directory: ./src/DotfilesLinker
       - name: Remove debug symbols
         shell: bash
         run: |
@@ -67,11 +68,11 @@ jobs:
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
-        run: Compress-Archive -Path ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
-        run: tar -czvf ${{ matrix.archive_name }} -C ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }} .
+        run: tar -czvf ${{ matrix.archive_name }} -C ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }} .
       - name: Upload artifact
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
