@@ -41,7 +41,7 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build --logger GitHubActions --logger "console;verbosity=normal"
       - name: Publish
-        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:EnableAot=true
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true
         working-directory: ./src/DotfilesLinker
 
   # marker job to target PR status check

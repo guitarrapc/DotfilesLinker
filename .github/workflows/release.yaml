@@ -2,7 +2,7 @@ name: Release
 on:
   push:
     tags:
-      - '*.*.*'        # 1.2.3
+      - "*.*.*" # 1.2.3
 
 jobs:
   publish:
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
-        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version="${TAG}" --artifacts-path ./artifacts
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:Version="${TAG}" --artifacts-path ./artifacts
       - name: Remove debug symbols
         shell: bash
         run: |
