@@ -21,9 +21,9 @@ jobs:
             rid: linux-x64
           - os: ubuntu-24.04-arm
             rid: linux-arm64
-          - os: macos-13
+          - os: macos-15-intel
             rid: osx-x64
-          - os: macos-15
+          - os: macos-26
             rid: osx-arm64
     permissions:
       contents: read
@@ -41,8 +41,47 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build --logger GitHubActions --logger "console;verbosity=normal"
       - name: Publish
-        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true
+        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts/${{ matrix.rid }}
         working-directory: ./src/DotfilesLinker
+      - name: Upload artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: ${{ matrix.rid }}
+          path: ./artifacts/**
+          retention-days: 1
+          if-no-files-found: error
+
+  execute:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            rid: win-x64
+          - os: windows-11-arm
+            rid: win-arm64
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: macos-26
+            rid: osx-arm64
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          path: ./artifacts
+          merge-multiple: true
+      - name: Execute published binary without runtime
+        run: |
+          ./artifacts/${{ matrix.rid }}/DotfilesLinker --version
+          ./artifacts/${{ matrix.rid }}/DotfilesLinker --help
 
   # marker job to target PR status check
   build:

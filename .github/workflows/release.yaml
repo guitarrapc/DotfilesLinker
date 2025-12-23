@@ -23,10 +23,10 @@ jobs:
           - os: ubuntu-24.04-arm
             rid: linux-arm64
             archive_name: DotfilesLinker_linux_arm64.tar.gz
-          - os: macos-13
+          - os: macos-15-intel
             rid: osx-x64
             archive_name: DotfilesLinker_darwin_amd64.tar.gz
-          - os: macos-15
+          - os: macos-26
             rid: osx-arm64
             archive_name: DotfilesLinker_darwin_arm64.tar.gz
     permissions:
@@ -52,7 +52,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
-        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:Version="${TAG}" --artifacts-path ./artifacts
+        run: dotnet publish -c Release -r ${{ matrix.rid }} -p:Version="${TAG}" --artifacts-path ./artifacts
       - name: Remove debug symbols
         shell: bash
         run: |

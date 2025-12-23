@@ -11,7 +11,6 @@
 
   <PropertyGroup>
     <PublishAot>true</PublishAot>
-    <PublishSingleFile>true</PublishSingleFile>
     <StripSymbols>true</StripSymbols>
     <TrimMode>full</TrimMode>
     <DebugType>embedded</DebugType>
