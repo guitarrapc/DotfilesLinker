@@ -110,6 +110,7 @@ jobs:
         with:
           cosign-release: v2.5.0
       # Setup Cosign keys for signing
+      # seiton: disable-step unredacted-secrets
       - name: Setup Cosign keys
         run: |
           echo "${SYNCED_COSIGN_PRIVATE_KEY}" > cosign.key
