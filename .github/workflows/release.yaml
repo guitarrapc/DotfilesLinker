@@ -112,8 +112,10 @@ jobs:
       # Setup Cosign keys for signing
       - name: Setup Cosign keys
         run: |
-          echo "${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}" > cosign.key
+          echo "${SYNCED_COSIGN_PRIVATE_KEY}" > cosign.key
           chmod 600 cosign.key
+        env:
+          SYNCED_COSIGN_PRIVATE_KEY: ${{ secrets.SYNCED_COSIGN_PRIVATE_KEY }}
       # Generate SHA256 checksums for all artifacts
       - name: Generate checksums
         shell: bash
