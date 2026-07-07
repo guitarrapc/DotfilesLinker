@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  build-test-publish:
+  build:
     strategy:
       fail-fast: false
       matrix:
@@ -57,7 +57,7 @@ jobs:
           if-no-files-found: error
 
   execute:
-    needs: [build-test-publish]
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
@@ -103,10 +103,9 @@ jobs:
           ./artifacts/release_${{ matrix.rid }}/DotfilesLinker --help
 
   # marker job to target PR status check
-  build:
-    needs: build-test-publish
-    permissions:
-      contents: read
+  build-complete:
+    needs: [build, execute]
+    permissions: {}
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     steps:
