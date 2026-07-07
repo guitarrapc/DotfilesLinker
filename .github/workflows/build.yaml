@@ -57,7 +57,7 @@ jobs:
           if-no-files-found: error
 
   execute:
-    needs: [build-test-publish]
+    needs: [build]
     strategy:
       fail-fast: false
       matrix:
