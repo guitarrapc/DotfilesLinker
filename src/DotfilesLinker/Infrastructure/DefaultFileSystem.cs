@@ -124,40 +124,7 @@ internal sealed class DefaultFileSystem : IFileSystem
         Directory.EnumerateDirectories(root, "*", SearchOption.TopDirectoryOnly);
 
     /// <inheritdoc/>
-    public void EnsureDirectory(string p, IList<string> createdDirectories)
-    {
-        var fullPath = Path.GetFullPath(p);
-        var pathRoot = Path.GetPathRoot(fullPath);
-        var missingDirectories = new Stack<string>();
-
-        for (var current = fullPath; !Directory.Exists(current);)
-        {
-            if (pathRoot is not null && PathsEqual(current, pathRoot))
-            {
-                break;
-            }
-
-            missingDirectories.Push(current);
-            var parent = Path.GetDirectoryName(current);
-            if (parent is null || PathsEqual(parent, current))
-            {
-                break;
-            }
-
-            current = parent;
-        }
-
-        while (missingDirectories.TryPop(out var directory))
-        {
-            if (Directory.Exists(directory))
-            {
-                continue;
-            }
-
-            Directory.CreateDirectory(directory);
-            createdDirectories.Add(directory);
-        }
-    }
+    public void EnsureDirectory(string p) => Directory.CreateDirectory(p);
 
     /// <inheritdoc/>
     public string[] ReadAllLines(string path) => File.ReadAllLines(path);
@@ -186,11 +153,4 @@ internal sealed class DefaultFileSystem : IFileSystem
             suffix > 0;
     }
 
-    private static bool PathsEqual(string first, string second) =>
-        string.Equals(
-            first,
-            second,
-            OperatingSystem.IsWindows()
-                ? StringComparison.OrdinalIgnoreCase
-                : StringComparison.Ordinal);
 }

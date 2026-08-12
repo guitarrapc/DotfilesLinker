@@ -57,14 +57,11 @@ public sealed class FileSystemTests : IDisposable
     public void EnsureDirectory_CreatesDirectoryAndIsIdempotent()
     {
         var path = Path.Combine(_root, "parent", "child");
-        var parent = Path.GetDirectoryName(path)!;
-        var createdDirectories = new List<string>();
 
-        _fileSystem.EnsureDirectory(path, createdDirectories);
-        _fileSystem.EnsureDirectory(path, createdDirectories);
+        _fileSystem.EnsureDirectory(path);
+        _fileSystem.EnsureDirectory(path);
 
         Assert.True(Directory.Exists(path));
-        Assert.Equal([parent, path], createdDirectories);
     }
 
     [Fact]

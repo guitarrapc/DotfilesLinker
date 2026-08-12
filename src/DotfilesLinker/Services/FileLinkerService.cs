@@ -411,7 +411,6 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             return;
         }
 
-        var createdDirectories = new List<string>();
         var appliedOperations = new List<AppliedLinkOperation>(operations.Count);
         try
         {
@@ -421,7 +420,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 {
                     var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
                     _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
-                    fileSystem.EnsureDirectory(targetDirectory, createdDirectories);
+                    fileSystem.EnsureDirectory(targetDirectory);
                 }
             }
 
@@ -439,7 +438,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             try
             {
-                RollbackLinkPlan(appliedOperations, createdDirectories);
+                RollbackAppliedOperations(appliedOperations);
             }
             catch (Exception rollbackException)
             {
@@ -452,43 +451,43 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             throw;
         }
 
-        try
-        {
-            foreach (var appliedOperation in appliedOperations)
-            {
-                if (appliedOperation.BackupPath is not null)
-                {
-                    fileSystem.DeleteBackup(
-                        appliedOperation.BackupPath,
-                        appliedOperation.Operation.Target);
-                }
-            }
-        }
-        catch (Exception cleanupException)
-        {
-            try
-            {
-                RollbackLinkPlan(appliedOperations, createdDirectories);
-            }
-            catch (Exception rollbackException)
-            {
-                throw new AggregateException(
-                    "Failed to remove replacement backups and roll back the link plan.",
-                    cleanupException,
-                    rollbackException);
-            }
-
-            throw new IOException(
-                "Failed to remove a replacement backup; the link plan was rolled back.",
-                cleanupException);
-        }
-
         foreach (var appliedOperation in appliedOperations)
         {
             var operation = appliedOperation.Operation;
             _logger.Log(
                 LogLevel.Success,
                 $"Created symbolic link: {PathUtilities.NormalizePath(operation.Target)} -> {PathUtilities.NormalizePath(operation.Source)}");
+        }
+
+        List<Exception>? cleanupExceptions = null;
+        foreach (var appliedOperation in appliedOperations)
+        {
+            if (appliedOperation.BackupPath is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                fileSystem.DeleteBackup(
+                    appliedOperation.BackupPath,
+                    appliedOperation.Operation.Target);
+            }
+            catch (Exception ex)
+            {
+                cleanupExceptions ??= [];
+                cleanupExceptions.Add(new IOException(
+                    $"Failed to remove replacement backup '{appliedOperation.BackupPath}'.",
+                    ex));
+            }
+        }
+
+        if (cleanupExceptions is not null)
+        {
+            throw new IOException(
+                "The link plan was applied, but one or more replacement backups could not be removed. " +
+                "Created links remain in place; inspect the reported backup paths.",
+                new AggregateException(cleanupExceptions));
         }
     }
 
@@ -605,45 +604,6 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 rollbackExceptions ??= [];
                 rollbackExceptions.Add(new IOException(
                     $"Failed to roll back destination '{operation.Operation.Target}'.",
-                    ex));
-            }
-        }
-
-        if (rollbackExceptions is not null)
-        {
-            throw new AggregateException(rollbackExceptions);
-        }
-    }
-
-    private void RollbackLinkPlan(
-        IReadOnlyList<AppliedLinkOperation> operations,
-        IReadOnlyList<string> createdDirectories)
-    {
-        List<Exception>? rollbackExceptions = null;
-        try
-        {
-            RollbackAppliedOperations(operations);
-        }
-        catch (Exception ex)
-        {
-            rollbackExceptions = [ex];
-        }
-
-        for (var index = createdDirectories.Count - 1; index >= 0; index--)
-        {
-            var directory = createdDirectories[index];
-            try
-            {
-                if (fileSystem.DirectoryExists(directory))
-                {
-                    fileSystem.Delete(directory);
-                }
-            }
-            catch (Exception ex)
-            {
-                rollbackExceptions ??= [];
-                rollbackExceptions.Add(new IOException(
-                    $"Failed to remove directory '{directory}' created by the link plan.",
                     ex));
             }
         }
