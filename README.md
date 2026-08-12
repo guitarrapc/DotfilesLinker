@@ -339,7 +339,7 @@ Differences and unsupported behavior:
 ### Automatic Exclusions
 
 The following files and directories are automatically excluded:
-- Version control system folders (`.git`, `.svn`, `.hg`)
+- Version control system folders/files (`.git`, `.svn`, `.hg`)
 - Non-dotfiles in the root directory
 - OS-specific files like `.DS_Store` (macOS) and `Thumbs.db` (Windows)
 - Temporary files like `*.bak`, `*.tmp`, and vim swap files
