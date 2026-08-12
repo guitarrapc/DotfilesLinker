@@ -477,7 +477,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             {
                 cleanupExceptions ??= [];
                 cleanupExceptions.Add(new IOException(
-                    $"Failed to remove replacement backup '{appliedOperation.BackupPath}'.",
+                    $"'{PathUtilities.NormalizePath(appliedOperation.BackupPath)}': {ex.Message}",
                     ex));
             }
         }
@@ -486,7 +486,10 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             throw new IOException(
                 "The link plan was applied, but one or more replacement backups could not be removed. " +
-                "Created links remain in place; inspect the reported backup paths.",
+                $"Created links remain in place. Remove these backups manually if appropriate:{Environment.NewLine}" +
+                string.Join(
+                    Environment.NewLine,
+                    cleanupExceptions.Select(static exception => $"  - {exception.Message}")),
                 new AggregateException(cleanupExceptions));
         }
     }

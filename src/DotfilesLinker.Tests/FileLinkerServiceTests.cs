@@ -685,6 +685,8 @@ public class FileLinkerServiceTests
 
         Assert.Contains("link plan was applied", exception.Message);
         Assert.Contains("Created links remain in place", exception.Message);
+        Assert.Contains(backup, exception.Message);
+        Assert.Contains("backup cleanup failed", exception.Message);
         Received.InOrder(() =>
         {
             _fileSystemMock.Move(target, backup);
@@ -717,10 +719,17 @@ public class FileLinkerServiceTests
         _fileSystemMock
             .When(fs => fs.DeleteBackup(firstBackup, firstTarget))
             .Do(_ => throw new IOException("first cleanup failed"));
+        _fileSystemMock
+            .When(fs => fs.DeleteBackup(secondBackup, secondTarget))
+            .Do(_ => throw new UnauthorizedAccessException("second cleanup denied"));
 
-        Assert.Throws<IOException>(() =>
+        var exception = Assert.Throws<IOException>(() =>
             _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
 
+        Assert.Contains(firstBackup, exception.Message);
+        Assert.Contains("first cleanup failed", exception.Message);
+        Assert.Contains(secondBackup, exception.Message);
+        Assert.Contains("second cleanup denied", exception.Message);
         _fileSystemMock.Received(1).DeleteBackup(firstBackup, firstTarget);
         _fileSystemMock.Received(1).DeleteBackup(secondBackup, secondTarget);
         _fileSystemMock.DidNotReceive().Delete(firstTarget);
