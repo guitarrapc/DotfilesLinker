@@ -46,15 +46,7 @@ jobs:
       # output to ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/*
       - name: Publish
         shell: bash
-        run: dotnet publish -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
-        working-directory: ./src/DotfilesLinker
-      - name: Upload artifact
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
-        with:
-          name: ${{ matrix.rid }}
-          path: ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/**
-          retention-days: 1
-          if-no-files-found: error
+        run: dotnet publish ./src/DotfilesLinker/ -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
       - name: Execute published binary without runtime
         shell: bash
         run: |
