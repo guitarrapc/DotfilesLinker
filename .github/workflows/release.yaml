@@ -106,7 +106,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          publish_dir="./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}"
+          publish_dir="./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}"
           sbom_dir="${RUNNER_TEMP}/dotfileslinker-sbom-${{ matrix.rid }}"
           validation_output="${RUNNER_TEMP}/dotfileslinker-sbom-validation-${{ matrix.rid }}.json"
 
@@ -133,11 +133,11 @@ jobs:
       - name: Create archive (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
-        run: Compress-Archive -Path ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/* -DestinationPath ${{ matrix.archive_name }}
       - name: Create archive (Linux/macOS)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
-        run: tar -czvf ${{ matrix.archive_name }} -C ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }} .
+        run: tar -czvf ${{ matrix.archive_name }} -C ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }} .
       - name: Attest build provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
