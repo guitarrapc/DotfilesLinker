@@ -445,24 +445,35 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <returns>An ordered matcher containing the active rules.</returns>
     private GitignoreMatcher LoadIgnoreList(string ignoreFilePath)
     {
-        if (!fileSystem.FileExists(ignoreFilePath))
+        try
         {
-            _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
-            return new(Array.Empty<string>());
+            if (!fileSystem.PathExists(ignoreFilePath))
+            {
+                _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
+                return new(Array.Empty<string>());
+            }
+
+            var lines = fileSystem.ReadAllLines(ignoreFilePath);
+            _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
+
+            var ignoreMatcher = new GitignoreMatcher(lines);
+
+            // Debug output for each ignored pattern
+            foreach (var pattern in lines)
+            {
+                _logger.Verbose($"Ignoring pattern: '{pattern}'");
+            }
+
+            return ignoreMatcher;
         }
-
-        var lines = fileSystem.ReadAllLines(ignoreFilePath);
-        _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
-
-        var ignoreMatcher = new GitignoreMatcher(lines);
-
-        // Debug output for each ignored pattern
-        foreach (var pattern in lines)
+        catch (UnauthorizedAccessException ex)
         {
-            _logger.Verbose($"Ignoring pattern: '{pattern}'");
+            throw new UnauthorizedAccessException($"Failed to load ignore file '{ignoreFilePath}'.", ex);
         }
-
-        return ignoreMatcher;
+        catch (IOException ex)
+        {
+            throw new IOException($"Failed to load ignore file '{ignoreFilePath}'.", ex);
+        }
     }
 
     private readonly record struct SourceEntry(string Path, bool IsDirectory);

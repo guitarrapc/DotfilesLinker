@@ -31,7 +31,7 @@ public class FileIgnoreEnhancedTests
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false)
             .Returns(new[] { dsStorePath });
 
-        _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
+        _fileSystemMock.PathExists(Path.Combine(repoRoot, ignoreFileName))
             .Returns(false);
 
         // Act
@@ -58,7 +58,7 @@ public class FileIgnoreEnhancedTests
             .Returns(new[] { bashrcPath, vimrcPath });
 
         // Setup ignore file with pattern that ignores all dot files but includes .vimrc
-        _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
+        _fileSystemMock.PathExists(Path.Combine(repoRoot, ignoreFileName))
             .Returns(true);
         _fileSystemMock.ReadAllLines(Path.Combine(repoRoot, ignoreFileName))
             .Returns(new[] { ".*", "!.vimrc" });
@@ -92,7 +92,7 @@ public class FileIgnoreEnhancedTests
             });
 
         // Setup ignore file with gitignore style pattern
-        _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
+        _fileSystemMock.PathExists(Path.Combine(repoRoot, ignoreFileName))
             .Returns(true);
         _fileSystemMock.ReadAllLines(Path.Combine(repoRoot, ignoreFileName))
             .Returns(new[] { "HOME/config/settings.json", "HOME/log/**" });
@@ -126,7 +126,7 @@ public class FileIgnoreEnhancedTests
         _fileSystemMock.DirectoryExists(homeDir).Returns(true);
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(Array.Empty<string>());
         _fileSystemMock.EnumerateDirectories(homeDir).Returns([cacheDir]);
-        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(true);
         _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(["HOME/cache/"]);
 
         _service.LinkDotfiles(
@@ -155,7 +155,7 @@ public class FileIgnoreEnhancedTests
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(Array.Empty<string>());
         _fileSystemMock.EnumerateDirectories(homeDir).Returns([configDir]);
         _fileSystemMock.EnumerateFiles(configDir, "*", false).Returns([source]);
-        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(true);
         _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(["config/settings.json"]);
 
         _service.LinkDotfiles(

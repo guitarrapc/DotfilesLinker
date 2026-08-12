@@ -57,7 +57,7 @@ public class FileLinkerServiceTests
         string ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
 
         // Mock ignore file existance check
-        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(true);
 
         // Mock ReadAllLines
         _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(ignoredFiles);
@@ -71,6 +71,47 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
+    public void LinkDotfiles_ShouldStopWhenIgnoreFileCannotBeRead()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "repo");
+        var userHome = Path.Combine(Path.GetTempPath(), "home", "user");
+        var ignoreFileName = "dotfiles_ignore";
+        var ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
+        var readException = new IOException("access denied");
+
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(_ => throw readException);
+
+        var exception = Assert.Throws<IOException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite: false));
+
+        Assert.Same(readException, exception.InnerException);
+        Assert.Contains(ignoreFilePath, exception.Message);
+        _fileSystemMock.DidNotReceive().EnumerateFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldStopWhenIgnoreFileCannotBeInspected()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "repo");
+        var userHome = Path.Combine(Path.GetTempPath(), "home", "user");
+        var ignoreFileName = "dotfiles_ignore";
+        var ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
+        var inspectionException = new UnauthorizedAccessException("access denied");
+
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(_ => throw inspectionException);
+
+        var exception = Assert.Throws<UnauthorizedAccessException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite: false));
+
+        Assert.Same(inspectionException, exception.InnerException);
+        Assert.Contains(ignoreFilePath, exception.Message);
+        _fileSystemMock.DidNotReceive().ReadAllLines(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnumerateFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldThrowException_WhenTargetExistsAndOverwriteIsFalse()
     {
         // Arrange
@@ -80,8 +121,9 @@ public class FileLinkerServiceTests
         bool overwrite = false;
 
         var filesInRepo = new[] { "/repo/.file1" };
+        var target = Path.Combine(userHome, ".file1");
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(filesInRepo);
-        _fileSystemMock.PathExists(Arg.Any<string>()).Returns(true);
+        _fileSystemMock.PathExists(target).Returns(true);
         _fileSystemMock.GetLinkTarget(Arg.Any<string>()).Returns((string?)null);
 
         // Act & Assert
@@ -287,7 +329,7 @@ public class FileLinkerServiceTests
         string ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
 
         // Mock ignore file existance check
-        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.PathExists(ignoreFilePath).Returns(true);
 
         // Mock ReadAllLines
         _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(ignoredFiles);
