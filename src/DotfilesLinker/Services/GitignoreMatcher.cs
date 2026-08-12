@@ -1,4 +1,4 @@
-using DotfilesLinker.Utilities;
+using System.Buffers;
 
 namespace DotfilesLinker.Services;
 
@@ -7,6 +7,7 @@ namespace DotfilesLinker.Services;
 /// </summary>
 public sealed class GitignoreMatcher
 {
+    private const int MaxStackAllocatedSegments = 64;
     private readonly Rule[] _rules;
 
     /// <summary>
@@ -36,29 +37,50 @@ public sealed class GitignoreMatcher
     {
         ArgumentNullException.ThrowIfNull(path);
 
-        var normalizedPath = NormalizePath(path);
-        var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
-        {
-            var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
-            var ignored = false;
+        return IsIgnoredCore(path, isDirectory);
+    }
 
-            foreach (var rule in _rules)
+    private bool IsIgnoredCore(string path, bool isDirectory)
+    {
+        var segmentCount = CountPathSegments(path);
+        PathSegment[]? rentedSegments = null;
+        Span<PathSegment> pathSegments = segmentCount <= MaxStackAllocatedSegments
+            ? stackalloc PathSegment[segmentCount]
+            : (rentedSegments = ArrayPool<PathSegment>.Shared.Rent(segmentCount));
+        pathSegments = pathSegments[..segmentCount];
+        FillPathSegments(path, pathSegments);
+
+        try
+        {
+            for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
             {
-                if (rule.IsMatch(pathSegments, pathLength, candidateIsDirectory))
+                var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
+                var ignored = false;
+
+                foreach (var rule in _rules)
                 {
-                    ignored = !rule.Negated;
+                    if (rule.IsMatch(path, pathSegments, pathLength, candidateIsDirectory))
+                    {
+                        ignored = !rule.Negated;
+                    }
+                }
+
+                // Git cannot re-include a file while one of its parent directories remains excluded.
+                if (ignored)
+                {
+                    return true;
                 }
             }
 
-            // Git cannot re-include a file while one of its parent directories remains excluded.
-            if (ignored)
+            return false;
+        }
+        finally
+        {
+            if (rentedSegments is not null)
             {
-                return true;
+                ArrayPool<PathSegment>.Shared.Return(rentedSegments);
             }
         }
-
-        return false;
     }
 
     /// <summary>
@@ -75,21 +97,90 @@ public sealed class GitignoreMatcher
             return false;
         }
 
-        var pathSegments = NormalizePath(path).Split('/', StringSplitOptions.RemoveEmptyEntries);
-        for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
+        return IsRuleMatch(path, isDirectory, rule);
+    }
+
+    private static bool IsRuleMatch(string path, bool isDirectory, Rule rule)
+    {
+        var segmentCount = CountPathSegments(path);
+        PathSegment[]? rentedSegments = null;
+        Span<PathSegment> pathSegments = segmentCount <= MaxStackAllocatedSegments
+            ? stackalloc PathSegment[segmentCount]
+            : (rentedSegments = ArrayPool<PathSegment>.Shared.Rent(segmentCount));
+        pathSegments = pathSegments[..segmentCount];
+        FillPathSegments(path, pathSegments);
+
+        try
         {
-            var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
-            if (rule.IsMatch(pathSegments, pathLength, candidateIsDirectory))
+            for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
             {
-                return true;
+                var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
+                if (rule.IsMatch(path, pathSegments, pathLength, candidateIsDirectory))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        finally
+        {
+            if (rentedSegments is not null)
+            {
+                ArrayPool<PathSegment>.Shared.Return(rentedSegments);
+            }
+        }
+    }
+
+    private static int CountPathSegments(ReadOnlySpan<char> path)
+    {
+        var count = 0;
+        var insideSegment = false;
+        foreach (var character in path)
+        {
+            if (IsDirectorySeparator(character))
+            {
+                insideSegment = false;
+            }
+            else if (!insideSegment)
+            {
+                insideSegment = true;
+                count++;
             }
         }
 
-        return false;
+        return count;
     }
 
-    private static string NormalizePath(string path) =>
-        PathUtilities.NormalizePathForPatternMatching(path).TrimStart('/');
+    private static void FillPathSegments(ReadOnlySpan<char> path, Span<PathSegment> segments)
+    {
+        var segmentIndex = 0;
+        var segmentStart = -1;
+
+        for (var index = 0; index <= path.Length; index++)
+        {
+            var atEnd = index == path.Length;
+            if (!atEnd && !IsDirectorySeparator(path[index]))
+            {
+                if (segmentStart < 0)
+                {
+                    segmentStart = index;
+                }
+
+                continue;
+            }
+
+            if (segmentStart >= 0)
+            {
+                segments[segmentIndex++] = new PathSegment(segmentStart, index - segmentStart);
+                segmentStart = -1;
+            }
+        }
+    }
+
+    private static bool IsDirectorySeparator(char character) => character is '/' or '\\';
+
+    private readonly record struct PathSegment(int Start, int Length);
 
     private sealed class Rule
     {
@@ -150,7 +241,11 @@ public sealed class GitignoreMatcher
                 : new Rule(pattern, negated, anchored, directoryOnly);
         }
 
-        public bool IsMatch(string[] pathSegments, int pathLength, bool isDirectory)
+        public bool IsMatch(
+            string path,
+            ReadOnlySpan<PathSegment> pathSegments,
+            int pathLength,
+            bool isDirectory)
         {
             if (pathLength == 0)
             {
@@ -165,16 +260,17 @@ public sealed class GitignoreMatcher
             if (!_hasSlash && !_anchored)
             {
                 return (!_directoryOnly || isDirectory) &&
-                    WildcardMatcher.IsMatch(pathSegments[pathLength - 1], _segments[0]);
+                    MatchPathSegment(path, pathSegments[pathLength - 1], _segments[0]);
             }
 
             return (!_directoryOnly || isDirectory) &&
-                MatchSegments(_segments, pathSegments, 0, 0, pathLength);
+                MatchSegments(_segments, path, pathSegments, 0, 0, pathLength);
         }
 
         private static bool MatchSegments(
             string[] patternSegments,
-            string[] pathSegments,
+            string path,
+            ReadOnlySpan<PathSegment> pathSegments,
             int patternIndex,
             int pathIndex,
             int pathLength)
@@ -193,6 +289,7 @@ public sealed class GitignoreMatcher
                     {
                         if (MatchSegments(
                             patternSegments,
+                            path,
                             pathSegments,
                             patternIndex + 1,
                             nextPathIndex,
@@ -205,7 +302,7 @@ public sealed class GitignoreMatcher
                     return false;
                 }
 
-                if (!WildcardMatcher.IsMatch(pathSegments[pathIndex], segment))
+                if (!MatchPathSegment(path, pathSegments[pathIndex], segment))
                 {
                     return false;
                 }
@@ -221,6 +318,11 @@ public sealed class GitignoreMatcher
 
             return patternIndex == patternSegments.Length && pathIndex == pathLength;
         }
+
+        private static bool MatchPathSegment(string path, PathSegment pathSegment, string pattern) =>
+            WildcardMatcher.IsMatch(
+                path.AsSpan(pathSegment.Start, pathSegment.Length),
+                pattern.AsSpan());
 
         private static string TrimUnescapedTrailingSpaces(string pattern)
         {

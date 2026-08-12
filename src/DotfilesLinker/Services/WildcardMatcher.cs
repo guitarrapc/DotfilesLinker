@@ -14,6 +14,15 @@ public static class WildcardMatcher
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(pattern);
 
+        return IsMatch(text.AsSpan(), pattern.AsSpan());
+    }
+
+    /// <summary>
+    /// Matches spans without allocating temporary strings or match tables.
+    /// </summary>
+    public static bool IsMatch(ReadOnlySpan<char> text, ReadOnlySpan<char> pattern)
+    {
+
         var textIndex = 0;
         var patternIndex = 0;
         var starPatternIndex = -1;
@@ -59,7 +68,7 @@ public static class WildcardMatcher
         return patternIndex == pattern.Length;
     }
 
-    private static bool TryMatchToken(string pattern, int index, char value, out int nextIndex)
+    private static bool TryMatchToken(ReadOnlySpan<char> pattern, int index, char value, out int nextIndex)
     {
         var token = pattern[index];
         if (token == '?')
@@ -84,7 +93,7 @@ public static class WildcardMatcher
     }
 
     private static bool TryMatchCharacterClass(
-        string pattern,
+        ReadOnlySpan<char> pattern,
         int startIndex,
         char value,
         out int nextIndex,

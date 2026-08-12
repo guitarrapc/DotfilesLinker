@@ -212,4 +212,30 @@ public class WildcardMatcherTests
     {
         Assert.Equal(expected, Services.WildcardMatcher.IsMatch(text, pattern));
     }
+
+    [Fact]
+    public void IsMatch_AvoidsPerCallHeapAllocation()
+    {
+        const string text = "application-2026-08-12.log";
+        const string pattern = "app*[0-9]-??-??.log";
+
+        for (var i = 0; i < 100; i++)
+        {
+            Services.WildcardMatcher.IsMatch(text, pattern);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var matchCount = 0;
+        for (var i = 0; i < 10_000; i++)
+        {
+            if (Services.WildcardMatcher.IsMatch(text, pattern))
+            {
+                matchCount++;
+            }
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(10_000, matchCount);
+        Assert.InRange(allocated, 0, 64 * 1024);
+    }
 }

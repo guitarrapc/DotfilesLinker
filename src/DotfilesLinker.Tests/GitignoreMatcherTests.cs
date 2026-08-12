@@ -124,6 +124,42 @@ public class GitignoreMatcherTests
     }
 
     [Fact]
+    public void IsIgnored_CommonPathAvoidsPerCallHeapAllocation()
+    {
+        var matcher = new Services.GitignoreMatcher(
+            ["*.tmp", "HOME/**/cache/", "HOME/config/*.json"]);
+        const string path = "HOME/config/settings.json";
+
+        for (var i = 0; i < 100; i++)
+        {
+            matcher.IsIgnored(path);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var ignoredCount = 0;
+        for (var i = 0; i < 10_000; i++)
+        {
+            if (matcher.IsIgnored(path))
+            {
+                ignoredCount++;
+            }
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(10_000, ignoredCount);
+        Assert.InRange(allocated, 0, 64 * 1024);
+    }
+
+    [Fact]
+    public void IsIgnored_HandlesPathDeeperThanStackAllocatedSegmentLimit()
+    {
+        var matcher = new Services.GitignoreMatcher(["**/target.txt"]);
+        var path = string.Join('/', Enumerable.Repeat("level", 70).Append("target.txt"));
+
+        Assert.True(matcher.IsIgnored(path));
+    }
+
+    [Fact]
     public void IsMatch_ExactPathMatch_ReturnsTrue()
     {
         // Arrange
