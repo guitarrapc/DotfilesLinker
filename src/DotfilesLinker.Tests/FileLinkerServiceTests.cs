@@ -264,4 +264,30 @@ public class FileLinkerServiceTests
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, ".DS_Store"), "/repo/.DS_Store");
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Path.Combine(userHome, "custom.ignore"), "/repo/custom.ignore");
     }
+
+    [Fact]
+    public void LinkDotfiles_ShouldSkipEquivalentRelativeSymbolicLink()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "relative-link-service");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var source = Path.Combine(repoRoot, ".settings");
+        var target = Path.Combine(userHome, ".settings");
+        var relativeLinkTarget = Path.GetRelativePath(userHome, source);
+
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([source]);
+        _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);
+        _fileSystemMock.FileExists(target).Returns(true);
+        _fileSystemMock.GetLinkTarget(target).Returns(relativeLinkTarget);
+
+        _service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: false);
+
+        _fileSystemMock.Received(1).GetLinkTarget(target);
+        _fileSystemMock.DidNotReceive().Delete(target);
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(target, source);
+    }
 }

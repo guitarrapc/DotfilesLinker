@@ -8,24 +8,59 @@ namespace DotfilesLinker.Utilities;
 public static class PathUtilities
 {
     /// <summary>
-    /// Compares two file or directory paths for equality, considering their absolute paths.
+    /// Compares two paths after converting them to absolute paths.
     /// </summary>
-    /// <param name="a">The first path to compare.</param>
-    /// <param name="b">The second path to compare.</param>
+    public static bool PathEquals(string first, string second)
+    {
+        if (string.IsNullOrEmpty(first) || string.IsNullOrEmpty(second))
+        {
+            return false;
+        }
+
+        return PathsEqual(
+            Path.GetFullPath(first),
+            Path.GetFullPath(second));
+    }
+
+    /// <summary>
+    /// Determines whether a symbolic link target resolves to an expected path.
+    /// </summary>
+    /// <param name="linkPath">The path of the symbolic link.</param>
+    /// <param name="linkTarget">The target stored in the symbolic link.</param>
+    /// <param name="expectedTarget">The expected target path.</param>
     /// <returns>
-    /// <c>true</c> if the absolute paths of <paramref name="a"/> and <paramref name="b"/> are equal; otherwise, <c>false</c>.
+    /// <c>true</c> if the resolved link target and expected target are equal; otherwise, <c>false</c>.
     /// </returns>
     /// <remarks>
-    /// This method resolves the absolute paths of the input paths using <see cref="Path.GetFullPath(string)"/>
-    /// and performs a case-sensitive comparison using <see cref="StringComparison.Ordinal"/>.
+    /// A relative <paramref name="linkTarget"/> is resolved from the parent directory of
+    /// <paramref name="linkPath"/>. Path comparison is case-insensitive on Windows and
+    /// case-sensitive on other platforms.
     /// </remarks>
-    public static bool PathEquals(string a, string b)
+    public static bool LinkTargetEquals(string linkPath, string linkTarget, string expectedTarget)
     {
-        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        if (string.IsNullOrEmpty(linkPath) ||
+            string.IsNullOrEmpty(linkTarget) ||
+            string.IsNullOrEmpty(expectedTarget))
+        {
             return false;
+        }
 
-        return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.Ordinal);
+        var fullLinkPath = Path.GetFullPath(linkPath);
+        var linkDirectory = Path.GetDirectoryName(fullLinkPath)!;
+        var resolvedLinkTarget = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(linkTarget, linkDirectory));
+        var fullExpectedTarget = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(expectedTarget));
+        return PathsEqual(resolvedLinkTarget, fullExpectedTarget);
     }
+
+    private static bool PathsEqual(string first, string second) =>
+        string.Equals(
+            first,
+            second,
+            OperatingSystem.IsWindows()
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal);
 
     /// <summary>
     /// Normalizes a path for consistent display across platforms.

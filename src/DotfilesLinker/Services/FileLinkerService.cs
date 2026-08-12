@@ -290,7 +290,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             var currentLinkTarget = fileSystem.GetLinkTarget(target);
 
             // If the target is a symlink and points to the same file, do nothing
-            if (currentLinkTarget is not null && PathUtilities.PathEquals(currentLinkTarget, source))
+            if (currentLinkTarget is not null &&
+                PathUtilities.LinkTargetEquals(target, currentLinkTarget, source))
             {
                 if (dryRun)
                 {
