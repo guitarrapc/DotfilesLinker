@@ -3,19 +3,22 @@ using DotfilesLinker.Services;
 using System.Reflection;
 
 // parse args
-bool showHelp = args.Any(a => a.Equals("--help", StringComparison.OrdinalIgnoreCase) || a.Equals("-h", StringComparison.OrdinalIgnoreCase));
-bool showVersion = args.Any(a => a.Equals("--version", StringComparison.OrdinalIgnoreCase));
-bool forceOverwrite = args.Any(a => a.Equals("--force", StringComparison.OrdinalIgnoreCase));
-bool verbose = args.Any(a => a.Equals("--verbose", StringComparison.OrdinalIgnoreCase) || a.Equals("-v", StringComparison.OrdinalIgnoreCase));
-bool dryRun = args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase) || a.Equals("-d", StringComparison.OrdinalIgnoreCase));
+if (!CliOptionsParser.TryParse(args, out var options, out var optionError))
+{
+    var appName = Path.GetFileNameWithoutExtension(Environment.ProcessPath);
+    Console.Error.WriteLine($"Error: {optionError}");
+    Console.Error.WriteLine($"Try '{appName} --help' for more information.");
+    Environment.ExitCode = 2;
+    return;
+}
 
 // display help or version information and exit if requested
-if (showHelp)
+if (options.ShowHelp)
 {
     DisplayHelp();
     return;
 }
-if (showVersion)
+if (options.ShowVersion)
 {
     DisplayVersion();
     return;
@@ -23,7 +26,7 @@ if (showVersion)
 
 // build up
 var fs = new DefaultFileSystem();
-var logger = new ConsoleLogger(verbose);
+var logger = new ConsoleLogger(options.Verbose);
 var svc = new FileLinkerService(fs, logger);
 
 // Get configuration from environment variables or use defaults
@@ -34,15 +37,15 @@ string ignoreFileName = Environment.GetEnvironmentVariable("DOTFILES_IGNORE_FILE
 logger.Info($"Execution root: {executionRoot}");
 logger.Info($"User home: {userHome}");
 logger.Info($"Ignore file: {ignoreFileName}");
-logger.Info($"Force overwrite: {forceOverwrite}");
-logger.Info($"Dry run: {dryRun}");
+logger.Info($"Force overwrite: {options.ForceOverwrite}");
+logger.Info($"Dry run: {options.DryRun}");
 
 // execute
 try
 {
-    svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, forceOverwrite, dryRun);
+    svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, options.ForceOverwrite, options.DryRun);
 
-    if (dryRun)
+    if (options.DryRun)
     {
         logger.Success("Dry run completed successfully. No changes were made.");
     }
