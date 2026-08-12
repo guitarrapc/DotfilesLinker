@@ -16,8 +16,14 @@ internal class NullLogger : ILogger
     public void Verbose(string message) { }
 }
 
-internal class ConsoleLogger(bool verbose) : ILogger
+internal class ConsoleLogger(
+    bool verbose,
+    TextWriter? output = null,
+    TextWriter? error = null) : ILogger
 {
+    private readonly TextWriter _output = output ?? Console.Out;
+    private readonly TextWriter _error = error ?? Console.Error;
+
     public void Success(string message)
     {
         WriteSuccess(message);
@@ -44,16 +50,28 @@ internal class ConsoleLogger(bool verbose) : ILogger
         }
     }
 
-    static void WriteSuccess(string msg) => WriteColored("[o] ", msg, ConsoleColor.Green);
-    static void WriteError(string msg) => WriteColored("[x] ", msg, ConsoleColor.Red);
-    static void WriteInfo(string msg) => WriteColored("[i] ", msg, ConsoleColor.Cyan);
-    static void WriteVerbose(string msg) => WriteColored("[v] ", msg, ConsoleColor.Yellow);
+    void WriteSuccess(string msg) => WriteColored(_output, "[o] ", msg, ConsoleColor.Green);
+    void WriteError(string msg) => WriteColored(_error, "[x] ", msg, ConsoleColor.Red);
+    void WriteInfo(string msg) => WriteColored(_output, "[i] ", msg, ConsoleColor.Cyan);
+    void WriteVerbose(string msg) => WriteColored(_output, "[v] ", msg, ConsoleColor.Yellow);
 
-    static void WriteColored(string prefix, string msg, ConsoleColor color)
+    static void WriteColored(TextWriter writer, string prefix, string msg, ConsoleColor color)
     {
+        if (!ReferenceEquals(writer, Console.Out) && !ReferenceEquals(writer, Console.Error))
+        {
+            writer.WriteLine($"{prefix}{msg}");
+            return;
+        }
+
         var prev = Console.ForegroundColor;
-        Console.ForegroundColor = color;
-        Console.WriteLine($"{prefix}{msg}");
-        Console.ForegroundColor = prev;
+        try
+        {
+            Console.ForegroundColor = color;
+            writer.WriteLine($"{prefix}{msg}");
+        }
+        finally
+        {
+            Console.ForegroundColor = prev;
+        }
     }
 }
