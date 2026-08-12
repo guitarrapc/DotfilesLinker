@@ -51,7 +51,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <exception cref="InvalidOperationException">
     /// Thrown if a target file or directory already exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    public void LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite, bool dryRun = false)
+    public int LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite, bool dryRun = false)
     {
         if (!Path.IsPathRooted(repoRoot))
         {
@@ -88,6 +88,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         CollectHomeOperations(repoRoot, userHome, ignoreMatcher, operations);
         CollectRootOperations(repoRoot, ignoreMatcher, operations);
 
+        if (operations.Count == 0)
+        {
+            _logger.Error(
+                $"No linkable dotfiles were found in '{repoRoot}'. " +
+                "Verify the repository path with --root or run the command from the dotfiles repository.");
+            return 0;
+        }
+
         var validatedOperations = ValidateLinkPlan(repoRoot, operations, overwrite);
         ApplyLinkPlan(validatedOperations, dryRun);
 
@@ -99,6 +107,8 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             _logger.Info("Dotfiles linking completed");
         }
+
+        return operations.Count;
     }
 
     /*-----------------------------------------------------------
