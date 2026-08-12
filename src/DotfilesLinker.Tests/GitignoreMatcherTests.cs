@@ -92,6 +92,23 @@ public class GitignoreMatcherTests
     }
 
     [Fact]
+    public void IsIgnored_UnescapedTrailingSpacesAreIgnored()
+    {
+        var matcher = new Services.GitignoreMatcher(["report.tmp   "]);
+
+        Assert.True(matcher.IsIgnored("report.tmp"));
+    }
+
+    [Fact]
+    public void IsIgnored_EscapedTrailingSpaceIsSignificant()
+    {
+        var matcher = new Services.GitignoreMatcher([@"report.tmp\ "]);
+
+        Assert.True(matcher.IsIgnored("report.tmp "));
+        Assert.False(matcher.IsIgnored("report.tmp"));
+    }
+
+    [Fact]
     public void IsMatch_ExactPathMatch_ReturnsTrue()
     {
         // Arrange

@@ -294,6 +294,40 @@ docs/*
 
 As with Git, a file cannot be re-included while one of its parent directories remains excluded. Re-include the parent directory first, as shown in the `docs/README.md` example. Built-in automatic exclusions cannot be overridden by negation rules.
 
+#### Compatibility with `.gitignore`
+
+`dotfiles_ignore` implements a practical subset of the [Git ignore pattern format](https://git-scm.com/docs/gitignore), but it is not a drop-in replacement for Git's complete ignore mechanism.
+
+Supported behavior:
+
+| Feature | Support |
+| --- | --- |
+| Empty lines and comments beginning with `#` | Supported |
+| Escaped leading `\#` and `\!` | Supported |
+| Unescaped trailing spaces are ignored | Supported |
+| Escaped trailing spaces are significant | Supported |
+| Last matching rule wins | Supported |
+| Negation with `!` | Supported, including Git's excluded-parent restriction |
+| Patterns without `/` | Match a file or directory name at any depth |
+| Leading `/` and patterns containing `/` | Match relative to the dotfiles repository root |
+| Trailing `/` | Matches directories and their descendants only |
+| `*` and `?` | Supported within one path segment |
+| Simple character classes such as `[abc]`, `[0-9]`, `[!abc]`, and `[^abc]` | Supported |
+| `**/name`, `dir/**`, and `a/**/b` | Supported |
+| Backslash escapes such as `file\*.txt` | Supported within a path segment |
+
+Differences and unsupported behavior:
+
+| Git behavior | DotfilesLinker behavior |
+| --- | --- |
+| Git combines repository `.gitignore` files, nested `.gitignore` files, `.git/info/exclude`, a global excludes file, and command-line rules | Only the configured `DOTFILES_IGNORE_FILE` is read once from the repository root; the default filename is `dotfiles_ignore` |
+| A nested `.gitignore` uses its containing directory as the pattern base | Nested ignore files are not discovered; all slash-containing patterns use the dotfiles repository root as their base |
+| Case sensitivity follows Git/filesystem configuration such as `core.ignoreCase` | Matching is always case-insensitive on every platform |
+| Git uses its complete wildmatch/fnmatch character-class behavior | POSIX classes such as `[[:digit:]]`, collating/equivalence classes, and uncommon literal `]` class forms are not supported |
+| Git defines only specific placements of consecutive `**` as special | Only `**` used as a complete path segment in the documented forms is Git-compatible; other consecutive-star forms are not validated and may behave like `*` |
+| Git ignore rules affect untracked-file discovery and interact with Git's index | DotfilesLinker has no tracked/untracked concept; rules only decide which repository files are considered for linking |
+| Git has no mandatory built-in ignore patterns | DotfilesLinker's automatic exclusions are applied separately and cannot be re-included with `!` |
+
 
 ### Automatic Exclusions
 
