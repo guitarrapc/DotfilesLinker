@@ -170,25 +170,35 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
-    public void LinkDotfiles_ShouldValidateAllExistingTargetsBeforeApplyingPlan()
+    public void LinkDotfiles_ShouldContinueAfterExistingTargetConflict()
     {
         var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "preflight-conflict");
         var repoRoot = Path.Combine(root, "repo");
         var userHome = Path.Combine(root, "home");
         var firstSource = Path.Combine(repoRoot, ".first");
         var secondSource = Path.Combine(repoRoot, ".second");
+        var firstTarget = Path.Combine(userHome, ".first");
         var secondTarget = Path.Combine(userHome, ".second");
+        var logger = new TestLogger();
+        var service = new FileLinkerService(_fileSystemMock, logger.Logger);
 
         _fileSystemMock
             .EnumerateFiles(repoRoot, ".*", false)
             .Returns([firstSource, secondSource]);
         _fileSystemMock.PathExists(secondTarget).Returns(true);
 
-        Assert.Throws<InvalidOperationException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
+        var result = service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: false);
 
-        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
-        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+        Assert.Equal(new LinkSummary(Created: 1, Replaced: 0, Skipped: 0, Failed: 1), result.Summary);
+        Assert.True(result.HasErrors);
+        Assert.Contains(secondTarget, logger.Error);
+        Assert.Contains("use --force", logger.Error);
+        _fileSystemMock.Received(1).CreateFileSymlink(firstTarget, firstSource);
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(secondTarget, secondSource);
         _fileSystemMock.DidNotReceive().Move(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().Delete(Arg.Any<string>());
     }
@@ -365,7 +375,7 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
-    public void LinkDotfiles_ShouldThrowException_WhenTargetExistsAndOverwriteIsFalse()
+    public void LinkDotfiles_ShouldReportFailure_WhenTargetExistsAndOverwriteIsFalse()
     {
         // Arrange
         string repoRoot = Path.Combine(Path.GetTempPath(), "repo");
@@ -379,9 +389,17 @@ public class FileLinkerServiceTests
         _fileSystemMock.PathExists(target).Returns(true);
         _fileSystemMock.GetLinkTarget(Arg.Any<string>()).Returns((string?)null);
 
-        // Act & Assert
-        Assert.Throws<InvalidOperationException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite));
+        var logger = new TestLogger();
+        var service = new FileLinkerService(_fileSystemMock, logger.Logger);
+
+        var result = service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite);
+
+        Assert.Equal(new LinkSummary(Created: 0, Replaced: 0, Skipped: 0, Failed: 1), result.Summary);
+        Assert.True(result.HasErrors);
+        Assert.Contains("target already exists", logger.Error);
+        Assert.Contains("use --force", logger.Error);
+        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
     }
 
 

@@ -115,9 +115,14 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
         }
 
         logger.Log(LogLevel.Info, $"Processing {sourceDirectory} directory: {sourcePath}");
-        var entries = new List<SourceEntry>();
         var ignoredPaths = new List<string>();
-        CollectFiles(repoRoot, sourcePath, ignoreMatcher, entries, ignoredPaths);
+        var operationCount = CollectFiles(
+            repoRoot,
+            sourcePath,
+            destinationDirectory,
+            ignoreMatcher,
+            operations,
+            ignoredPaths);
 
         if (ignoredPaths.Count > 0)
         {
@@ -128,26 +133,20 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
             }
         }
 
-        logger.Log(LogLevel.Info, $"Found {entries.Count} entries to link from {sourceDirectory} directory to {destinationDirectory}");
-        foreach (var entry in entries)
-        {
-            var relativePath = Path.GetRelativePath(sourcePath, entry.Path);
-            operations.Add(new(
-                entry.Path,
-                Path.Combine(destinationDirectory, relativePath),
-                entry.IsDirectory));
-        }
+        logger.Log(LogLevel.Info, $"Found {operationCount} entries to link from {sourceDirectory} directory to {destinationDirectory}");
     }
 
-    private void CollectFiles(
+    private int CollectFiles(
         string repoRoot,
         string sourceRoot,
+        string destinationRoot,
         GitignoreMatcher ignoreMatcher,
-        List<SourceEntry> entries,
+        List<LinkOperation> operations,
         List<string> ignoredPaths)
     {
         var pendingDirectories = new Stack<string>();
         pendingDirectories.Push(sourceRoot);
+        var operationCount = 0;
 
         while (pendingDirectories.TryPop(out var currentDirectory))
         {
@@ -160,7 +159,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
                 }
                 else if (fileSystem.IsSymbolicLink(directory))
                 {
-                    entries.Add(new(directory, IsDirectory: true));
+                    AddOperation(directory, sourceIsDirectory: true);
                 }
                 else
                 {
@@ -177,9 +176,21 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
                 }
                 else
                 {
-                    entries.Add(new(file, IsDirectory: false));
+                    AddOperation(file, sourceIsDirectory: false);
                 }
             }
+        }
+
+        return operationCount;
+
+        void AddOperation(string source, bool sourceIsDirectory)
+        {
+            var relativePath = Path.GetRelativePath(sourceRoot, source);
+            operations.Add(new(
+                source,
+                Path.Combine(destinationRoot, relativePath),
+                sourceIsDirectory));
+            operationCount++;
         }
     }
 
@@ -222,8 +233,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
                 }
                 else
                 {
-                    throw new InvalidOperationException(
-                        $"'{PathUtilities.NormalizePath(operation.Target)}' already exists; use --force to overwrite.");
+                    disposition = LinkDisposition.Conflict;
                 }
             }
 
@@ -285,6 +295,4 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
             throw new IOException($"Failed to load ignore file '{ignoreFilePath}'.", ex);
         }
     }
-
-    private readonly record struct SourceEntry(string Path, bool IsDirectory);
 }

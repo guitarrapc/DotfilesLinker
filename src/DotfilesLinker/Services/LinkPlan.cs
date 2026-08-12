@@ -20,5 +20,6 @@ internal enum LinkDisposition
 {
     Create,
     Replace,
-    Skip
+    Skip,
+    Conflict
 }

@@ -31,6 +31,14 @@ internal sealed class LinkPlanExecutor(IFileSystem fileSystem, ILogger logger)
         foreach (var operation in operations)
         {
             LogLinkOperation(operation);
+            if (operation.Disposition == LinkDisposition.Conflict)
+            {
+                failed++;
+                failures ??= [];
+                failures.Add(new IOException(GetConflictMessage(operation)));
+                continue;
+            }
+
             if (operation.Disposition == LinkDisposition.Skip)
             {
                 _ = LinkFile(operation, dryRun: false);
@@ -131,6 +139,7 @@ internal sealed class LinkPlanExecutor(IFileSystem fileSystem, ILogger logger)
         var created = 0;
         var replaced = 0;
         var skipped = 0;
+        var failed = 0;
 
         foreach (var operation in operations)
         {
@@ -145,10 +154,13 @@ internal sealed class LinkPlanExecutor(IFileSystem fileSystem, ILogger logger)
                 case LinkDisposition.Skip:
                     skipped++;
                     break;
+                case LinkDisposition.Conflict:
+                    failed++;
+                    break;
             }
         }
 
-        return new(created, replaced, skipped, Failed: 0);
+        return new(created, replaced, skipped, failed);
     }
 
     private void LogLinkOperation(ValidatedLinkOperation operation) =>
@@ -160,6 +172,12 @@ internal sealed class LinkPlanExecutor(IFileSystem fileSystem, ILogger logger)
         var (source, target, sourceIsDirectory) = operation;
         var normalizedSource = PathUtilities.NormalizePath(source);
         var normalizedTarget = PathUtilities.NormalizePath(target);
+
+        if (disposition == LinkDisposition.Conflict)
+        {
+            logger.Log(LogLevel.Error, $"{GetConflictMessage(validatedOperation)}");
+            return null;
+        }
 
         if (disposition == LinkDisposition.Skip)
         {
@@ -255,6 +273,10 @@ internal sealed class LinkPlanExecutor(IFileSystem fileSystem, ILogger logger)
 
         fileSystem.Move(backupPath, target);
     }
+
+    private static string GetConflictMessage(ValidatedLinkOperation operation) =>
+        $"Failed to link '{PathUtilities.NormalizePath(operation.Operation.Target)}' from " +
+        $"'{PathUtilities.NormalizePath(operation.Operation.Source)}': target already exists; use --force to overwrite.";
 
     private readonly record struct AppliedLinkOperation(
         LinkOperation Operation,
