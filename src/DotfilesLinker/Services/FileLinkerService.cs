@@ -3,9 +3,14 @@ using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Services;
 
-internal readonly record struct LinkSummary(int Created, int Replaced, int Skipped)
+internal readonly record struct LinkSummary(int Created, int Replaced, int Skipped, int Failed)
 {
-    public int Total => Created + Replaced + Skipped;
+    public int Total => Created + Replaced + Skipped + Failed;
+}
+
+internal readonly record struct LinkResult(LinkSummary Summary, int CleanupFailed)
+{
+    public bool HasErrors => Summary.Failed > 0 || CleanupFailed > 0;
 }
 
 /// <summary>
@@ -56,7 +61,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <exception cref="InvalidOperationException">
     /// Thrown if a target file or directory already exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    public LinkSummary LinkDotfiles(
+    public LinkResult LinkDotfiles(
         string repoRoot,
         string userHome,
         string ignoreFileName,
@@ -107,19 +112,22 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         }
 
         var validatedOperations = ValidateLinkPlan(repoRoot, operations, overwrite);
-        var summary = CreateSummary(validatedOperations);
-        ApplyLinkPlan(validatedOperations, dryRun);
+        var result = ApplyLinkPlan(validatedOperations, dryRun);
 
         if (dryRun)
         {
             _logger.Log(LogLevel.Info, "DRY RUN COMPLETED: No files were actually linked"u8);
+        }
+        else if (result.HasErrors)
+        {
+            _logger.Log(LogLevel.Info, "Dotfiles linking completed with errors"u8);
         }
         else
         {
             _logger.Log(LogLevel.Info, "Dotfiles linking completed"u8);
         }
 
-        return summary;
+        return result;
     }
 
     /*-----------------------------------------------------------
@@ -395,10 +403,10 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             }
         }
 
-        return new(created, replaced, skipped);
+        return new(created, replaced, skipped, Failed: 0);
     }
 
-    private void ApplyLinkPlan(IReadOnlyList<ValidatedLinkOperation> operations, bool dryRun)
+    private LinkResult ApplyLinkPlan(IReadOnlyList<ValidatedLinkOperation> operations, bool dryRun)
     {
         if (dryRun)
         {
@@ -408,58 +416,63 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 _ = LinkFile(operation, dryRun: true);
             }
 
-            return;
+            return new(CreateSummary(operations), CleanupFailed: 0);
         }
 
         var appliedOperations = new List<AppliedLinkOperation>(operations.Count);
-        try
+        List<Exception>? failures = null;
+        var created = 0;
+        var replaced = 0;
+        var skipped = 0;
+        var failed = 0;
+
+        foreach (var operation in operations)
         {
-            foreach (var operation in operations)
+            LogLinkOperation(operation);
+            if (operation.Disposition == LinkDisposition.Skip)
             {
-                if (operation.Disposition != LinkDisposition.Skip)
-                {
-                    var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
-                    _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
-                    fileSystem.EnsureDirectory(targetDirectory);
-                }
+                _ = LinkFile(operation, dryRun: false);
+                skipped++;
+                continue;
             }
 
-            foreach (var operation in operations)
+            try
             {
-                LogLinkOperation(operation);
+                var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
+                _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
+                fileSystem.EnsureDirectory(targetDirectory);
+
                 var appliedOperation = LinkFile(operation, dryRun: false);
                 if (appliedOperation is not null)
                 {
                     appliedOperations.Add(appliedOperation.Value);
                 }
+
+                if (operation.Disposition == LinkDisposition.Create)
+                {
+                    created++;
+                }
+                else
+                {
+                    replaced++;
+                }
+
+                _logger.Log(
+                    LogLevel.Success,
+                    $"Created symbolic link: {PathUtilities.NormalizePath(operation.Operation.Target)} -> {PathUtilities.NormalizePath(operation.Operation.Source)}");
             }
-        }
-        catch (Exception applyException)
-        {
-            try
+            catch (Exception ex)
             {
-                RollbackAppliedOperations(appliedOperations);
+                failed++;
+                failures ??= [];
+                failures.Add(new IOException(
+                    $"Failed to link '{PathUtilities.NormalizePath(operation.Operation.Target)}' from " +
+                    $"'{PathUtilities.NormalizePath(operation.Operation.Source)}': {ex.Message}",
+                    ex));
             }
-            catch (Exception rollbackException)
-            {
-                throw new AggregateException(
-                    "Failed to apply the link plan and roll back earlier operations.",
-                    applyException,
-                    rollbackException);
-            }
-
-            throw;
         }
 
-        foreach (var appliedOperation in appliedOperations)
-        {
-            var operation = appliedOperation.Operation;
-            _logger.Log(
-                LogLevel.Success,
-                $"Created symbolic link: {PathUtilities.NormalizePath(operation.Target)} -> {PathUtilities.NormalizePath(operation.Source)}");
-        }
-
-        List<Exception>? cleanupExceptions = null;
+        var cleanupFailed = 0;
         foreach (var appliedOperation in appliedOperations)
         {
             if (appliedOperation.BackupPath is null)
@@ -475,23 +488,27 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             }
             catch (Exception ex)
             {
-                cleanupExceptions ??= [];
-                cleanupExceptions.Add(new IOException(
-                    $"'{PathUtilities.NormalizePath(appliedOperation.BackupPath)}': {ex.Message}",
+                cleanupFailed++;
+                failures ??= [];
+                failures.Add(new IOException(
+                    $"Failed to remove replacement backup " +
+                    $"'{PathUtilities.NormalizePath(appliedOperation.BackupPath)}': {ex.Message}. " +
+                    "The created link remains in place; remove the backup manually if appropriate.",
                     ex));
             }
         }
 
-        if (cleanupExceptions is not null)
+        if (failures is not null)
         {
-            throw new IOException(
-                "The link plan was applied, but one or more replacement backups could not be removed. " +
-                $"Created links remain in place. Remove these backups manually if appropriate:{Environment.NewLine}" +
-                string.Join(
-                    Environment.NewLine,
-                    cleanupExceptions.Select(static exception => $"  - {exception.Message}")),
-                new AggregateException(cleanupExceptions));
+            foreach (var failure in failures)
+            {
+                _logger.Log(LogLevel.Error, $"{failure.Message}");
+            }
         }
+
+        return new(
+            new LinkSummary(created, replaced, skipped, failed),
+            cleanupFailed);
     }
 
     private void LogLinkOperation(ValidatedLinkOperation operation) =>
@@ -572,49 +589,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                         $"The original entry may remain at '{PathUtilities.NormalizePath(backupPath)}'.",
                         ex,
                         rollbackException);
-                    _logger.Log(LogLevel.Error, $"{combinedException.Message}");
                     throw combinedException;
                 }
             }
 
-            _logger.Log(LogLevel.Error, $"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
             throw;
         }
 
         return new(operation, backupPath);
-    }
-
-    private void RollbackAppliedOperations(IReadOnlyList<AppliedLinkOperation> operations)
-    {
-        List<Exception>? rollbackExceptions = null;
-        for (var index = operations.Count - 1; index >= 0; index--)
-        {
-            var operation = operations[index];
-            try
-            {
-                if (fileSystem.PathExists(operation.Operation.Target))
-                {
-                    fileSystem.Delete(operation.Operation.Target);
-                }
-
-                if (operation.BackupPath is not null)
-                {
-                    fileSystem.Move(operation.BackupPath, operation.Operation.Target);
-                }
-            }
-            catch (Exception ex)
-            {
-                rollbackExceptions ??= [];
-                rollbackExceptions.Add(new IOException(
-                    $"Failed to roll back destination '{operation.Operation.Target}'.",
-                    ex));
-            }
-        }
-
-        if (rollbackExceptions is not null)
-        {
-            throw new AggregateException(rollbackExceptions);
-        }
     }
 
     private string MoveTargetAside(string target)

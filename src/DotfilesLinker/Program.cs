@@ -49,17 +49,24 @@ try
     logger.Log(LogLevel.Info, $"Force overwrite: {options.ForceOverwrite}");
     logger.Log(LogLevel.Info, $"Dry run: {options.DryRun}");
 
-    var summary = svc.LinkDotfiles(
+    var result = svc.LinkDotfiles(
         executionRoot,
         userHome,
         ignoreFileName,
         options.ForceOverwrite,
         options.DryRun);
+    var summary = result.Summary;
     logger.Log(
         LogLevel.Summary,
-        $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}");
+        $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}, failed: {summary.Failed}");
 
     if (summary.Total == 0)
+    {
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (result.HasErrors)
     {
         Environment.ExitCode = 1;
         return;

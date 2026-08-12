@@ -24,14 +24,14 @@ public class FileLinkerServiceTests
         var logger = new TestLogger();
         var service = new FileLinkerService(_fileSystemMock, logger.Logger);
 
-        var summary = service.LinkDotfiles(
+        var result = service.LinkDotfiles(
             repoRoot,
             userHome,
             "dotfiles_ignore",
             overwrite: false,
             dryRun);
 
-        Assert.Equal(default, summary);
+        Assert.Equal(default, result);
         Assert.Contains("No linkable dotfiles were found", logger.Error);
         Assert.Contains("--root", logger.Error);
         _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
@@ -58,15 +58,17 @@ public class FileLinkerServiceTests
         _fileSystemMock.GetLinkTarget(replaceTarget).Returns("other-target");
         _fileSystemMock.GetLinkTarget(skipTarget).Returns(skipSource);
 
-        var summary = _service.LinkDotfiles(
+        var result = _service.LinkDotfiles(
             repoRoot,
             userHome,
             "dotfiles_ignore",
             overwrite: true,
             dryRun: true);
 
-        Assert.Equal(new LinkSummary(Created: 1, Replaced: 1, Skipped: 1), summary);
-        Assert.Equal(3, summary.Total);
+        Assert.Equal(
+            new LinkSummary(Created: 1, Replaced: 1, Skipped: 1, Failed: 0),
+            result.Summary);
+        Assert.Equal(3, result.Summary.Total);
     }
 
     [Fact]
@@ -216,37 +218,77 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
-    public void LinkDotfiles_ShouldRollbackEarlierLinksWhenLaterCreationFails()
+    public void LinkDotfiles_ShouldKeepSuccessfulLinksAndContinueAfterCreationFailure()
     {
         var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "apply-rollback");
         var repoRoot = Path.Combine(root, "repo");
         var userHome = Path.Combine(root, "home");
         var firstSource = Path.Combine(repoRoot, ".first");
         var secondSource = Path.Combine(repoRoot, ".second");
+        var thirdSource = Path.Combine(repoRoot, ".third");
         var firstTarget = Path.Combine(userHome, ".first");
         var secondTarget = Path.Combine(userHome, ".second");
-        var firstTargetInspectionCount = 0;
+        var thirdTarget = Path.Combine(userHome, ".third");
 
         _fileSystemMock
             .EnumerateFiles(repoRoot, ".*", false)
-            .Returns([firstSource, secondSource]);
-        _fileSystemMock
-            .PathExists(firstTarget)
-            .Returns(_ => firstTargetInspectionCount++ > 0);
-        _fileSystemMock.PathExists(secondTarget).Returns(false);
+            .Returns([firstSource, secondSource, thirdSource]);
         _fileSystemMock
             .When(fs => fs.CreateFileSymlink(secondTarget, secondSource))
             .Do(_ => throw new IOException("creation failed"));
 
-        Assert.Throws<IOException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
+        var result = _service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: false);
 
         Received.InOrder(() =>
         {
             _fileSystemMock.CreateFileSymlink(firstTarget, firstSource);
             _fileSystemMock.CreateFileSymlink(secondTarget, secondSource);
-            _fileSystemMock.Delete(firstTarget);
+            _fileSystemMock.CreateFileSymlink(thirdTarget, thirdSource);
         });
+        Assert.Equal(new LinkSummary(2, 0, 0, 1), result.Summary);
+        Assert.True(result.HasErrors);
+        _fileSystemMock.DidNotReceive().Delete(firstTarget);
+        _fileSystemMock.DidNotReceive().Delete(thirdTarget);
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldContinueAfterParentDirectoryCreationFailure()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "directory-failure");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var firstSource = Path.Combine(repoRoot, ".first");
+        var secondSource = Path.Combine(repoRoot, ".second");
+        var secondTarget = Path.Combine(userHome, ".second");
+        var ensureAttempt = 0;
+
+        _fileSystemMock
+            .EnumerateFiles(repoRoot, ".*", false)
+            .Returns([firstSource, secondSource]);
+        _fileSystemMock
+            .When(fs => fs.EnsureDirectory(userHome))
+            .Do(_ =>
+            {
+                if (ensureAttempt++ == 0)
+                {
+                    throw new UnauthorizedAccessException("directory denied");
+                }
+            });
+
+        var result = _service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: false);
+
+        Assert.Equal(new LinkSummary(1, 0, 0, 1), result.Summary);
+        Assert.True(result.HasErrors);
+        _fileSystemMock.Received(2).EnsureDirectory(userHome);
+        _fileSystemMock.Received(1).CreateFileSymlink(secondTarget, secondSource);
     }
 
     [Fact]
@@ -605,10 +647,14 @@ public class FileLinkerServiceTests
             .When(fs => fs.CreateFileSymlink(target, source))
             .Do(_ => throw creationException);
 
-        var exception = Assert.Throws<IOException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+        var result = _service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: true);
 
-        Assert.Same(creationException, exception);
+        Assert.Equal(new LinkSummary(0, 0, 0, 1), result.Summary);
+        Assert.True(result.HasErrors);
         Received.InOrder(() =>
         {
             _fileSystemMock.Move(target, backup);
@@ -672,6 +718,8 @@ public class FileLinkerServiceTests
         var source = Path.Combine(repoRoot, ".settings");
         var target = Path.Combine(userHome, ".settings");
         var backup = target + ".dotfileslinker-backup";
+        var logger = new TestLogger();
+        var service = new FileLinkerService(_fileSystemMock, logger.Logger);
 
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([source]);
         _fileSystemMock.PathExists(target).Returns(true);
@@ -680,13 +728,18 @@ public class FileLinkerServiceTests
             .When(fs => fs.DeleteBackup(backup, target))
             .Do(_ => throw new IOException("backup cleanup failed"));
 
-        var exception = Assert.Throws<IOException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+        var result = service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: true);
 
-        Assert.Contains("link plan was applied", exception.Message);
-        Assert.Contains("Created links remain in place", exception.Message);
-        Assert.Contains(backup, exception.Message);
-        Assert.Contains("backup cleanup failed", exception.Message);
+        Assert.Equal(new LinkSummary(0, 1, 0, 0), result.Summary);
+        Assert.Equal(1, result.CleanupFailed);
+        Assert.True(result.HasErrors);
+        Assert.Contains(backup, logger.Error);
+        Assert.Contains("backup cleanup failed", logger.Error);
+        Assert.Contains("created link remains in place", logger.Error);
         Received.InOrder(() =>
         {
             _fileSystemMock.Move(target, backup);
@@ -708,6 +761,8 @@ public class FileLinkerServiceTests
         var secondTarget = Path.Combine(userHome, ".second");
         var firstBackup = firstTarget + ".dotfileslinker-backup";
         var secondBackup = secondTarget + ".dotfileslinker-backup";
+        var logger = new TestLogger();
+        var service = new FileLinkerService(_fileSystemMock, logger.Logger);
 
         _fileSystemMock
             .EnumerateFiles(repoRoot, ".*", false)
@@ -723,13 +778,18 @@ public class FileLinkerServiceTests
             .When(fs => fs.DeleteBackup(secondBackup, secondTarget))
             .Do(_ => throw new UnauthorizedAccessException("second cleanup denied"));
 
-        var exception = Assert.Throws<IOException>(() =>
-            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+        var result = service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            ".dotfiles_ignore",
+            overwrite: true);
 
-        Assert.Contains(firstBackup, exception.Message);
-        Assert.Contains("first cleanup failed", exception.Message);
-        Assert.Contains(secondBackup, exception.Message);
-        Assert.Contains("second cleanup denied", exception.Message);
+        Assert.Equal(new LinkSummary(0, 2, 0, 0), result.Summary);
+        Assert.Equal(2, result.CleanupFailed);
+        Assert.Contains(firstBackup, logger.Error);
+        Assert.Contains("first cleanup failed", logger.Error);
+        Assert.Contains(secondBackup, logger.Error);
+        Assert.Contains("second cleanup denied", logger.Error);
         _fileSystemMock.Received(1).DeleteBackup(firstBackup, firstTarget);
         _fileSystemMock.Received(1).DeleteBackup(secondBackup, secondTarget);
         _fileSystemMock.DidNotReceive().Delete(firstTarget);

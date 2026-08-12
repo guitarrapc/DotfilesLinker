@@ -30,14 +30,14 @@ public class ConsoleLoggerTests
     public void Summary_ShouldWriteInterpolatedCountsToStandardOutput()
     {
         var logger = new TestLogger(verbose: false);
-        var summary = new LinkSummary(Created: 2, Replaced: 3, Skipped: 4);
+        var summary = new LinkSummary(Created: 2, Replaced: 3, Skipped: 4, Failed: 5);
 
         logger.Logger.Log(
             LogLevel.Summary,
-            $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}");
+            $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}, failed: {summary.Failed}");
 
         Assert.Equal(
-            $"Created: 2, replaced: 3, skipped: 4{Environment.NewLine}",
+            $"Created: 2, replaced: 3, skipped: 4, failed: 5{Environment.NewLine}",
             logger.Output);
         Assert.Equal(string.Empty, logger.Error);
     }
