@@ -55,46 +55,6 @@ jobs:
           path: ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/**
           retention-days: 1
           if-no-files-found: error
-
-  execute:
-    needs: [build]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-2025
-            rid: win-x64
-          - os: windows-11-arm
-            rid: win-arm64
-          - os: ubuntu-24.04
-            rid: linux-x64
-          - os: ubuntu-24.04-arm
-            rid: linux-arm64
-          - os: macos-15-intel
-            rid: osx-x64
-          - os: macos-26
-            rid: osx-arm64
-    permissions:
-      contents: read
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 10
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: ./artifacts
-          merge-multiple: true
-      - name: List artifacts
-        shell: bash
-        run: |
-          echo "Downloaded artifacts:"
-          find ./artifacts -type f | sort
-
-          # Ensure we have artifacts to release
-          if [ -z "$(find ./artifacts/release_${{ matrix.rid }} -type f)" ]; then
-            echo "::error::No artifacts found. Aborting release creation."
-            exit 1
-          fi
       - name: Execute published binary without runtime
         shell: bash
         run: |
@@ -104,7 +64,7 @@ jobs:
 
   # marker job to target PR status check
   build-complete:
-    needs: [build, execute]
+    needs: [build]
     permissions: {}
     runs-on: ubuntu-24.04
     timeout-minutes: 1
