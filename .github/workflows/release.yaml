@@ -110,6 +110,8 @@ jobs:
           sbom_dir="${RUNNER_TEMP}/dotfileslinker-sbom-${{ matrix.rid }}"
           validation_output="${RUNNER_TEMP}/dotfileslinker-sbom-validation-${{ matrix.rid }}.json"
 
+          mkdir -p "${sbom_dir}"
+
           dotnet tool run sbom-tool generate \
             -b "${publish_dir}" \
             -bc ./src/DotfilesLinker \
