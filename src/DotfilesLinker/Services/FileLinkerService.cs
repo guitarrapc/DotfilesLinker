@@ -137,44 +137,35 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         GitignoreMatcher ignoreMatcher,
         List<LinkOperation> operations)
     {
-        var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
-        _logger.Log(LogLevel.Verbose, $"Total files in repository root: {allFiles.Count}");
+        var totalCount = 0;
+        var linkedCount = 0;
+        var ignoredCount = 0;
 
-        // Filter files based on ignore patterns and default ignore patterns
-        var files = new List<string>();
-        var ignoredFiles = new List<string>();
-
-        foreach (var file in allFiles)
+        foreach (var file in fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false))
         {
+            totalCount++;
             var relPath = GetRepositoryRelativePath(repoRoot, file);
 
             if (ShouldIgnorePath(relPath, isDirectory: false, ignoreMatcher))
             {
-                ignoredFiles.Add(file);
+                ignoredCount++;
+                _logger.Log(LogLevel.Verbose, $"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
             }
             else
             {
-                files.Add(file);
+                linkedCount++;
+                var destination = Path.Combine(userHome, Path.GetFileName(file));
+                operations.Add(new(file, destination, SourceIsDirectory: false));
             }
         }
 
-        // Log ignored files
-        if (ignoredFiles.Any())
+        _logger.Log(LogLevel.Verbose, $"Total files in repository root: {totalCount}");
+        if (ignoredCount > 0)
         {
-            _logger.Log(LogLevel.Info, $"Ignoring {ignoredFiles.Count} files from repository root based on ignore patterns:");
-            foreach (var file in ignoredFiles)
-            {
-                _logger.Log(LogLevel.Verbose, $"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
-            }
+            _logger.Log(LogLevel.Info, $"Ignored {ignoredCount} files from repository root based on ignore patterns");
         }
 
-        _logger.Log(LogLevel.Info, $"Found {files.Count} files to link from repository root directory to {userHome}");
-
-        foreach (var src in files)
-        {
-            var dst = Path.Combine(userHome, Path.GetFileName(src));
-            operations.Add(new(src, dst, SourceIsDirectory: false));
-        }
+        _logger.Log(LogLevel.Info, $"Found {linkedCount} files to link from repository root directory to {userHome}");
     }
 
     /// <summary>
