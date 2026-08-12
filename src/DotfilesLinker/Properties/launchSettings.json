@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "DotfilesLinker": {
+      "commandName": "Project"
+    },
+    "--help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    }
+  }
+}
