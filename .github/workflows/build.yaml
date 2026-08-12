@@ -58,9 +58,9 @@ jobs:
       - name: Execute published binary without runtime
         shell: bash
         run: |
-          chmod +x ./artifacts/release_${{ matrix.rid }}/DotfilesLinker || true
-          ./artifacts/release_${{ matrix.rid }}/DotfilesLinker --version
-          ./artifacts/release_${{ matrix.rid }}/DotfilesLinker --help
+          chmod +x ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/DotfilesLinker || true
+          ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/DotfilesLinker --version
+          ./artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/DotfilesLinker --help
 
   # marker job to target PR status check
   build-complete:
