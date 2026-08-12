@@ -117,6 +117,44 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
+    public void LinkDotfiles_ShouldLinkDirectorySymlinkWithoutTraversingIt()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "repo");
+        var userHome = Path.Combine(Path.GetTempPath(), "home", "user");
+        var homeRoot = Path.Combine(repoRoot, "HOME");
+        var directoryLink = Path.Combine(homeRoot, ".config", "shared");
+        var target = Path.Combine(userHome, ".config", "shared");
+
+        _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
+        _fileSystemMock.DirectoryExists(directoryLink).Returns(true);
+        _fileSystemMock.EnumerateDirectories(homeRoot).Returns([directoryLink]);
+        _fileSystemMock.IsSymbolicLink(directoryLink).Returns(true);
+
+        _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false);
+
+        _fileSystemMock.Received(1).CreateDirectorySymlink(target, directoryLink);
+        _fileSystemMock.DidNotReceive().EnumerateDirectories(directoryLink);
+        _fileSystemMock.DidNotReceive().EnumerateFiles(directoryLink, Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRejectSymbolicHomeDirectory()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "repo");
+        var homeRoot = Path.Combine(repoRoot, "HOME");
+
+        _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
+        _fileSystemMock.IsSymbolicLink(homeRoot).Returns(true);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, "/home/user", ".dotfiles_ignore", overwrite: false));
+
+        Assert.Contains("must not be a symbolic link", exception.Message);
+        _fileSystemMock.DidNotReceive().EnumerateDirectories(homeRoot);
+        _fileSystemMock.DidNotReceive().EnumerateFiles(homeRoot, Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldIgnoreDefaultOSSpecificFiles()
     {
         // Arrange

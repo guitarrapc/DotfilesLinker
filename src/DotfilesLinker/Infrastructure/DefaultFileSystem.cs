@@ -7,6 +7,9 @@ internal sealed class DefaultFileSystem : IFileSystem
     /// <inheritdoc/>
     public bool DirectoryExists(string p) => Directory.Exists(p);
     /// <inheritdoc/>
+    public bool IsSymbolicLink(string p) =>
+        (File.GetAttributes(p) & FileAttributes.ReparsePoint) != 0;
+    /// <inheritdoc/>
     public string? GetLinkTarget(string p) =>
         new FileInfo(p).LinkTarget ?? new DirectoryInfo(p).LinkTarget;
 

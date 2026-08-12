@@ -157,6 +157,23 @@ public sealed class FileSystemTests : IDisposable
     }
 
     [Fact]
+    public void IsSymbolicLink_DetectsFileAndDirectoryLinks()
+    {
+        var fileTarget = CreateFile(Path.Combine("targets", "file-target.txt"));
+        var directoryTarget = Path.Combine(_root, "directory-target");
+        Directory.CreateDirectory(directoryTarget);
+        var fileLink = Path.Combine(_root, "file-link.txt");
+        var directoryLink = Path.Combine(_root, "directory-link");
+        _fileSystem.CreateFileSymlink(fileLink, fileTarget);
+        _fileSystem.CreateDirectorySymlink(directoryLink, directoryTarget);
+
+        Assert.False(_fileSystem.IsSymbolicLink(fileTarget));
+        Assert.False(_fileSystem.IsSymbolicLink(directoryTarget));
+        Assert.True(_fileSystem.IsSymbolicLink(fileLink));
+        Assert.True(_fileSystem.IsSymbolicLink(directoryLink));
+    }
+
+    [Fact]
     public void Delete_RemovesSymbolicLinkWithoutDeletingTarget()
     {
         var target = CreateFile(Path.Combine("targets", "preserved.txt"));

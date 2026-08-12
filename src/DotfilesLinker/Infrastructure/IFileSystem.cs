@@ -20,6 +20,13 @@ internal interface IFileSystem
     bool DirectoryExists(string path);
 
     /// <summary>
+    /// Determines whether the specified path is a symbolic link or another reparse point.
+    /// </summary>
+    /// <param name="path">The path to inspect.</param>
+    /// <returns><c>true</c> if the path is a symbolic link or reparse point; otherwise, <c>false</c>.</returns>
+    bool IsSymbolicLink(string path);
+
+    /// <summary>
     /// Gets the target of a symbolic link at the specified path.
     /// </summary>
     /// <param name="path">The path to the symbolic link.</param>

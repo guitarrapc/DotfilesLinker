@@ -132,7 +132,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
             _logger.Verbose($"Linking {src} to {dst}");
-            LinkFile(src, dst, overwrite, dryRun);
+            LinkFile(src, dst, sourceIsDirectory: false, overwrite, dryRun);
         }
     }
 
@@ -184,10 +184,15 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             return;
         }
 
+        if (fileSystem.IsSymbolicLink(srcPath))
+        {
+            throw new InvalidOperationException($"'{srcPath}' must not be a symbolic link.");
+        }
+
         _logger.Info($"Processing {srcDir} directory: {srcPath}");
-        var files = new List<string>();
+        var entries = new List<SourceEntry>();
         var ignoredPaths = new List<string>();
-        CollectFiles(repoRoot, srcPath, ignoreMatcher, files, ignoredPaths);
+        CollectFiles(repoRoot, srcPath, ignoreMatcher, entries, ignoredPaths);
 
         if (ignoredPaths.Count > 0)
         {
@@ -198,11 +203,11 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             }
         }
 
-        _logger.Info($"Found {files.Count} files to link from {srcDir} directory to {destDir}");
+        _logger.Info($"Found {entries.Count} entries to link from {srcDir} directory to {destDir}");
 
-        foreach (var file in files)
+        foreach (var entry in entries)
         {
-            var rel = Path.GetRelativePath(srcPath, file);
+            var rel = Path.GetRelativePath(srcPath, entry.Path);
             var dst = Path.Combine(destDir, rel);
 
             var dstDir = Path.GetDirectoryName(dst)!;
@@ -214,8 +219,8 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 fileSystem.EnsureDirectory(dstDir);
             }
 
-            _logger.Verbose($"Linking {file} to {dst}");
-            LinkFile(file, dst, overwrite, dryRun);
+            _logger.Verbose($"Linking {entry.Path} to {dst}");
+            LinkFile(entry.Path, dst, entry.IsDirectory, overwrite, dryRun);
         }
     }
 
@@ -226,7 +231,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         string repoRoot,
         string sourceRoot,
         GitignoreMatcher ignoreMatcher,
-        List<string> files,
+        List<SourceEntry> entries,
         List<string> ignoredPaths)
     {
         var pendingDirectories = new Stack<string>();
@@ -243,6 +248,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                     continue;
                 }
 
+                // Preserve directory links as links without traversing their targets. This also
+                // prevents junctions, external targets, and link cycles from escaping the repository.
+                if (fileSystem.IsSymbolicLink(directory))
+                {
+                    entries.Add(new(directory, IsDirectory: true));
+                    continue;
+                }
+
                 pendingDirectories.Push(directory);
             }
 
@@ -255,7 +268,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 }
                 else
                 {
-                    files.Add(file);
+                    entries.Add(new(file, IsDirectory: false));
                 }
             }
         }
@@ -273,12 +286,13 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// </summary>
     /// <param name="source">The source file or directory path.</param>
     /// <param name="target">The target file or directory path.</param>
+    /// <param name="sourceIsDirectory">Whether the source is a directory or directory link.</param>
     /// <param name="overwrite">Whether to overwrite the target if it already exists.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
     /// <exception cref="InvalidOperationException">
     /// Thrown if the target exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    private void LinkFile(string source, string target, bool overwrite, bool dryRun)
+    private void LinkFile(string source, string target, bool sourceIsDirectory, bool overwrite, bool dryRun)
     {
         // Normalize paths for cross-platform consistency in logs
         string normalizedSource = PathUtilities.NormalizePath(source);
@@ -324,7 +338,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         // Create the link (or just log what would happen in dry-run mode)
         try
         {
-            if (fileSystem.DirectoryExists(source))
+            if (sourceIsDirectory)
             {
                 if (dryRun)
                 {
@@ -389,4 +403,6 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
         return ignoreMatcher;
     }
+
+    private readonly record struct SourceEntry(string Path, bool IsDirectory);
 }
