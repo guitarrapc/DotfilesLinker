@@ -1,6 +1,6 @@
 ﻿namespace DotfilesLinker.Services;
 
-public interface ILogger
+internal interface ILogger
 {
     void Success(string message);
     void Error(string message);

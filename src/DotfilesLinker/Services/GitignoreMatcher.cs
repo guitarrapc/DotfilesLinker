@@ -5,7 +5,7 @@ namespace DotfilesLinker.Services;
 /// <summary>
 /// Evaluates an ordered set of gitignore-style rules against repository-relative paths.
 /// </summary>
-public sealed class GitignoreMatcher
+internal sealed class GitignoreMatcher
 {
     private const int MaxStackAllocatedSegments = 64;
     private readonly Rule[] _rules;

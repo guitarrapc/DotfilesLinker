@@ -1,6 +1,6 @@
 ﻿namespace DotfilesLinker.Infrastructure;
 
-public sealed class DefaultFileSystem : IFileSystem
+internal sealed class DefaultFileSystem : IFileSystem
 {
     /// <inheritdoc/>
     public bool FileExists(string p) => File.Exists(p);

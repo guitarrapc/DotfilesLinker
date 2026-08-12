@@ -6,7 +6,7 @@ namespace DotfilesLinker.Services;
 /// <summary>
 /// Provides functionality to link dotfiles from a repository to the user's home directory or system root.
 /// </summary>
-public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = null)
+internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = null)
 {
     private readonly ILogger _logger = logger ?? new NullLogger();
 

@@ -5,7 +5,7 @@ namespace DotfilesLinker.Utilities;
 /// <summary>
 /// Provides utility methods for working with file and directory paths.
 /// </summary>
-public static class PathUtilities
+internal static class PathUtilities
 {
     /// <summary>
     /// Compares two paths after converting them to absolute paths.

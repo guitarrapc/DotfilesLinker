@@ -3,7 +3,7 @@
 /// <summary>
 /// Provides an abstraction for file system operations to support testing and platform-specific behavior.
 /// </summary>
-public interface IFileSystem
+internal interface IFileSystem
 {
     /// <summary>
     /// Determines whether the specified file exists.

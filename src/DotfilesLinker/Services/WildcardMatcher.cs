@@ -3,7 +3,7 @@ namespace DotfilesLinker.Services;
 /// <summary>
 /// Matches a single path segment using gitignore-style wildcards.
 /// </summary>
-public static class WildcardMatcher
+internal static class WildcardMatcher
 {
     /// <summary>
     /// Matches <paramref name="text"/> against a pattern containing <c>*</c>, <c>?</c>,
