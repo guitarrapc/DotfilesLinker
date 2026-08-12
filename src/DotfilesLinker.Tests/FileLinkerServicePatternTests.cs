@@ -21,8 +21,8 @@ public class FileLinkerServicePatternTests
     public void LinkDotfiles_AppliesBuiltInPatterns(string repositoryPath, bool expectedIgnored)
     {
         var fileSystem = Substitute.For<IFileSystem>();
-        var logger = Substitute.For<ILogger>();
-        var service = new FileLinkerService(fileSystem, logger);
+        var logger = new TestLogger();
+        var service = new FileLinkerService(fileSystem, logger.Logger);
         var repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
         var userHome = Path.Combine(Path.DirectorySeparatorChar.ToString(), "home");
         var source = Path.Combine(repoRoot, repositoryPath.Replace('/', Path.DirectorySeparatorChar));
@@ -43,11 +43,11 @@ public class FileLinkerServicePatternTests
 
         if (expectedIgnored)
         {
-            logger.DidNotReceive().Success(Arg.Is<string>(message => message.Contains(source)));
+            Assert.DoesNotContain($" -> {source}", logger.Output);
         }
         else
         {
-            logger.Received().Success(Arg.Is<string>(message => message.Contains(source)));
+            Assert.Contains($" -> {source}", logger.Output);
         }
     }
 }

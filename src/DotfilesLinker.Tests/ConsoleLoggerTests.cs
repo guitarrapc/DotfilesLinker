@@ -1,4 +1,4 @@
-﻿using DotfilesLinker.Services;
+using DotfilesLinker.Services;
 
 namespace DotfilesLinker.Tests;
 
@@ -7,41 +7,67 @@ public class ConsoleLoggerTests
     [Fact]
     public void Error_ShouldWriteToStandardErrorOnly()
     {
-        using var standardOutput = new StringWriter();
-        using var standardError = new StringWriter();
-        var logger = new ConsoleLogger(verbose: false, standardOutput, standardError);
+        var logger = new TestLogger(verbose: false);
 
-        logger.Error("operation failed");
+        logger.Logger.Log(LogLevel.Error, "operation failed"u8);
 
-        Assert.Equal(string.Empty, standardOutput.ToString());
-        Assert.Equal($"[x] operation failed{Environment.NewLine}", standardError.ToString());
+        Assert.Equal(string.Empty, logger.Output);
+        Assert.Equal($"[x] operation failed{Environment.NewLine}", logger.Error);
     }
 
     [Fact]
     public void Success_ShouldWriteToStandardOutputOnly()
     {
-        using var standardOutput = new StringWriter();
-        using var standardError = new StringWriter();
-        var logger = new ConsoleLogger(verbose: false, standardOutput, standardError);
+        var logger = new TestLogger(verbose: false);
 
-        logger.Success("completed");
+        logger.Logger.Log(LogLevel.Success, "completed"u8);
 
-        Assert.Equal($"[o] completed{Environment.NewLine}", standardOutput.ToString());
-        Assert.Equal(string.Empty, standardError.ToString());
+        Assert.Equal($"[o] completed{Environment.NewLine}", logger.Output);
+        Assert.Equal(string.Empty, logger.Error);
     }
 
     [Fact]
-    public void Summary_ShouldWriteCountsToStandardOutput()
+    public void Summary_ShouldWriteInterpolatedCountsToStandardOutput()
     {
-        using var standardOutput = new StringWriter();
-        using var standardError = new StringWriter();
-        var logger = new ConsoleLogger(verbose: false, standardOutput, standardError);
+        var logger = new TestLogger(verbose: false);
+        var summary = new LinkSummary(Created: 2, Replaced: 3, Skipped: 4);
 
-        logger.Summary(new LinkSummary(Created: 2, Replaced: 3, Skipped: 4));
+        logger.Logger.Log(
+            LogLevel.Summary,
+            $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}");
 
         Assert.Equal(
             $"Created: 2, replaced: 3, skipped: 4{Environment.NewLine}",
-            standardOutput.ToString());
-        Assert.Equal(string.Empty, standardError.ToString());
+            logger.Output);
+        Assert.Equal(string.Empty, logger.Error);
+    }
+
+    [Fact]
+    public void Verbose_ShouldNotFormatOrWriteWhenDisabled()
+    {
+        var logger = new TestLogger(verbose: false);
+        var formatted = false;
+
+        logger.Logger.Log(LogLevel.Verbose, $"value: {FormatValue()}");
+
+        Assert.False(formatted);
+        Assert.Equal(string.Empty, logger.Output);
+
+        string FormatValue()
+        {
+            formatted = true;
+            return "formatted";
+        }
+    }
+
+    [Fact]
+    public void InterpolatedMessage_ShouldWriteUtf8WithoutLosingUnicode()
+    {
+        var logger = new TestLogger(verbose: true);
+        const string path = "ドットファイル/設定.json";
+
+        logger.Logger.Log(LogLevel.Info, $"対象: {path}");
+
+        Assert.Equal($"[i] 対象: {path}{Environment.NewLine}", logger.Output);
     }
 }

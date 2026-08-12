@@ -26,7 +26,7 @@ if (options.ShowVersion)
 
 // build up
 var fs = new DefaultFileSystem();
-var logger = new ConsoleLogger(options.Verbose);
+using var logger = new ConsoleLogger(options.Verbose);
 var svc = new FileLinkerService(fs, logger);
 
 // execute
@@ -43,11 +43,11 @@ try
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
     string ignoreFileName = Environment.GetEnvironmentVariable("DOTFILES_IGNORE_FILE") ?? "dotfiles_ignore";
 
-    logger.Info($"Execution root: {executionRoot}");
-    logger.Info($"User home: {userHome}");
-    logger.Info($"Ignore file: {ignoreFileName}");
-    logger.Info($"Force overwrite: {options.ForceOverwrite}");
-    logger.Info($"Dry run: {options.DryRun}");
+    logger.Log(LogLevel.Info, $"Execution root: {executionRoot}");
+    logger.Log(LogLevel.Info, $"User home: {userHome}");
+    logger.Log(LogLevel.Info, $"Ignore file: {ignoreFileName}");
+    logger.Log(LogLevel.Info, $"Force overwrite: {options.ForceOverwrite}");
+    logger.Log(LogLevel.Info, $"Dry run: {options.DryRun}");
 
     var summary = svc.LinkDotfiles(
         executionRoot,
@@ -55,7 +55,9 @@ try
         ignoreFileName,
         options.ForceOverwrite,
         options.DryRun);
-    logger.Summary(summary);
+    logger.Log(
+        LogLevel.Summary,
+        $"Created: {summary.Created}, replaced: {summary.Replaced}, skipped: {summary.Skipped}");
 
     if (summary.Total == 0)
     {
@@ -65,36 +67,36 @@ try
 
     if (options.DryRun)
     {
-        logger.Success("Dry run completed successfully. No changes were made.");
+        logger.Log(LogLevel.Success, "Dry run completed successfully. No changes were made."u8);
     }
     else
     {
-        logger.Success("All operations completed.");
+        logger.Log(LogLevel.Success, "All operations completed."u8);
     }
 }
 catch (UnauthorizedAccessException ex)
 {
-    logger.Error("Permission denied: " + ex.Message);
+    logger.Log(LogLevel.Error, $"Permission denied: {ex.Message}");
     Environment.Exit(1);
 }
 catch (FileNotFoundException ex)
 {
-    logger.Error("File not found: " + ex.Message);
+    logger.Log(LogLevel.Error, $"File not found: {ex.Message}");
     Environment.Exit(1);
 }
 catch (DirectoryNotFoundException ex)
 {
-    logger.Error("Directory not found: " + ex.Message);
+    logger.Log(LogLevel.Error, $"Directory not found: {ex.Message}");
     Environment.Exit(1);
 }
 catch (InvalidOperationException ex)
 {
-    logger.Error("Operation failed: " + ex.Message);
+    logger.Log(LogLevel.Error, $"Operation failed: {ex.Message}");
     Environment.Exit(1);
 }
 catch (Exception ex)
 {
-    logger.Error("An unexpected error occurred: " + ex.Message);
+    logger.Log(LogLevel.Error, $"An unexpected error occurred: {ex.Message}");
     Environment.Exit(1);
 }
 

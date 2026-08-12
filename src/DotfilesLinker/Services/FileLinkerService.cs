@@ -81,17 +81,17 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
         if (dryRun)
         {
-            _logger.Info("DRY RUN MODE: No files will be actually linked");
+            _logger.Log(LogLevel.Info, "DRY RUN MODE: No files will be actually linked"u8);
         }
 
-        _logger.Info($"Starting to link dotfiles from {repoRoot} to {userHome}");
-        _logger.Info($"Using ignore file: {ignoreFileName}");
+        _logger.Log(LogLevel.Info, $"Starting to link dotfiles from {repoRoot} to {userHome}");
+        _logger.Log(LogLevel.Info, $"Using ignore file: {ignoreFileName}");
 
         // Filter files in the root of the repository
         var ignorePath = Path.Combine(repoRoot, ignoreFileName);
         var ignoreMatcher = LoadIgnoreList(ignorePath);
-        _logger.Verbose($"Loaded {ignoreMatcher.Count} user-defined ignore patterns from {ignorePath}");
-        _logger.Verbose($"Using {_defaultIgnorePatterns.Length} default ignore patterns");
+        _logger.Log(LogLevel.Verbose, $"Loaded {ignoreMatcher.Count} user-defined ignore patterns from {ignorePath}");
+        _logger.Log(LogLevel.Verbose, $"Using {_defaultIgnorePatterns.Length} default ignore patterns");
 
         var operations = new List<LinkOperation>();
         CollectRepositoryRootOperations(repoRoot, userHome, ignoreMatcher, operations);
@@ -100,9 +100,9 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
         if (operations.Count == 0)
         {
-            _logger.Error(
-                $"No linkable dotfiles were found in '{repoRoot}'. " +
-                "Verify the repository path with --root or run the command from the dotfiles repository.");
+            _logger.Log(
+                LogLevel.Error,
+                $"No linkable dotfiles were found in '{repoRoot}'. Verify the repository path with --root or run the command from the dotfiles repository.");
             return default;
         }
 
@@ -112,11 +112,11 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
         if (dryRun)
         {
-            _logger.Info("DRY RUN COMPLETED: No files were actually linked");
+            _logger.Log(LogLevel.Info, "DRY RUN COMPLETED: No files were actually linked"u8);
         }
         else
         {
-            _logger.Info("Dotfiles linking completed");
+            _logger.Log(LogLevel.Info, "Dotfiles linking completed"u8);
         }
 
         return summary;
@@ -138,7 +138,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         List<LinkOperation> operations)
     {
         var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
-        _logger.Verbose($"Total files in repository root: {allFiles.Count}");
+        _logger.Log(LogLevel.Verbose, $"Total files in repository root: {allFiles.Count}");
 
         // Filter files based on ignore patterns and default ignore patterns
         var files = new List<string>();
@@ -161,14 +161,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         // Log ignored files
         if (ignoredFiles.Any())
         {
-            _logger.Info($"Ignoring {ignoredFiles.Count} files from repository root based on ignore patterns:");
+            _logger.Log(LogLevel.Info, $"Ignoring {ignoredFiles.Count} files from repository root based on ignore patterns:");
             foreach (var file in ignoredFiles)
             {
-                _logger.Verbose($"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
+                _logger.Log(LogLevel.Verbose, $"  Ignored file: {Path.GetFileName(file)} (matched ignore pattern)");
             }
         }
 
-        _logger.Info($"Found {files.Count} files to link from repository root directory to {userHome}");
+        _logger.Log(LogLevel.Info, $"Found {files.Count} files to link from repository root directory to {userHome}");
 
         foreach (var src in files)
         {
@@ -204,7 +204,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
-            _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
+            _logger.Log(LogLevel.Info, "Skipping ROOT directory processing on non-Unix platforms"u8);
             return;
         }
         CollectDirectoryOperations(repoRoot, "ROOT", "/", ignoreMatcher, operations);
@@ -227,7 +227,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         var srcPath = Path.Combine(repoRoot, srcDir);
         if (!fileSystem.DirectoryExists(srcPath))
         {
-            _logger.Info($"{srcDir} directory not found: {srcPath}");
+            _logger.Log(LogLevel.Info, $"{srcDir} directory not found: {srcPath}");
             return;
         }
 
@@ -236,21 +236,21 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             throw new InvalidOperationException($"'{srcPath}' must not be a symbolic link.");
         }
 
-        _logger.Info($"Processing {srcDir} directory: {srcPath}");
+        _logger.Log(LogLevel.Info, $"Processing {srcDir} directory: {srcPath}");
         var entries = new List<SourceEntry>();
         var ignoredPaths = new List<string>();
         CollectFiles(repoRoot, srcPath, ignoreMatcher, entries, ignoredPaths);
 
         if (ignoredPaths.Count > 0)
         {
-            _logger.Info($"Ignoring {ignoredPaths.Count} paths from {srcDir} directory based on ignore patterns:");
+            _logger.Log(LogLevel.Info, $"Ignoring {ignoredPaths.Count} paths from {srcDir} directory based on ignore patterns:");
             foreach (var path in ignoredPaths)
             {
-                _logger.Verbose($"  Ignored path: {path} (matched ignore pattern)");
+                _logger.Log(LogLevel.Verbose, $"  Ignored path: {path} (matched ignore pattern)");
             }
         }
 
-        _logger.Info($"Found {entries.Count} entries to link from {srcDir} directory to {destDir}");
+        _logger.Log(LogLevel.Info, $"Found {entries.Count} entries to link from {srcDir} directory to {destDir}");
 
         foreach (var entry in entries)
         {
@@ -425,7 +425,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             if (operation.Disposition != LinkDisposition.Skip)
             {
                 var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
-                _logger.Verbose($"Ensuring directory exists: {targetDirectory}");
+                _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
                 fileSystem.EnsureDirectory(targetDirectory);
             }
         }
@@ -492,14 +492,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         foreach (var appliedOperation in appliedOperations)
         {
             var operation = appliedOperation.Operation;
-            _logger.Success(
-                $"Created symbolic link: {PathUtilities.NormalizePath(operation.Target)} -> " +
-                PathUtilities.NormalizePath(operation.Source));
+            _logger.Log(
+                LogLevel.Success,
+                $"Created symbolic link: {PathUtilities.NormalizePath(operation.Target)} -> {PathUtilities.NormalizePath(operation.Source)}");
         }
     }
 
     private void LogLinkOperation(ValidatedLinkOperation operation) =>
-        _logger.Verbose($"Linking {operation.Operation.Source} to {operation.Operation.Target}");
+        _logger.Log(LogLevel.Verbose, $"Linking {operation.Operation.Source} to {operation.Operation.Target}");
 
     /// <summary>
     /// Creates a symbolic link from the source to the target path.
@@ -517,9 +517,14 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
         if (disposition == LinkDisposition.Skip)
         {
-            _logger.Success(dryRun
-                ? $"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}"
-                : $"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
+            if (dryRun)
+            {
+                _logger.Log(LogLevel.Success, $"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}");
+            }
+            else
+            {
+                _logger.Log(LogLevel.Success, $"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
+            }
             return null;
         }
 
@@ -527,12 +532,17 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             if (disposition == LinkDisposition.Replace)
             {
-                _logger.Verbose($"[DRY-RUN] Would replace existing target: {normalizedTarget}");
+                _logger.Log(LogLevel.Verbose, $"[DRY-RUN] Would replace existing target: {normalizedTarget}");
             }
 
-            _logger.Success(sourceIsDirectory
-                ? $"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}"
-                : $"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
+            if (sourceIsDirectory)
+            {
+                _logger.Log(LogLevel.Success, $"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}");
+            }
+            else
+            {
+                _logger.Log(LogLevel.Success, $"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
+            }
             return null;
         }
 
@@ -566,12 +576,12 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                         $"The original entry may remain at '{PathUtilities.NormalizePath(backupPath)}'.",
                         ex,
                         rollbackException);
-                    _logger.Error(combinedException.Message);
+                    _logger.Log(LogLevel.Error, $"{combinedException.Message}");
                     throw combinedException;
                 }
             }
 
-            _logger.Error($"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
+            _logger.Log(LogLevel.Error, $"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
             throw;
         }
 
@@ -619,7 +629,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             backupPath = $"{target}.dotfileslinker-backup.{suffix}";
         }
 
-        _logger.Verbose($"Temporarily moving existing target: {target} -> {backupPath}");
+        _logger.Log(LogLevel.Verbose, $"Temporarily moving existing target: {target} -> {backupPath}");
         fileSystem.Move(target, backupPath);
         return backupPath;
     }
@@ -652,19 +662,19 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             if (!fileSystem.PathExists(ignoreFilePath))
             {
-                _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
+                _logger.Log(LogLevel.Verbose, $"Ignore file not found: {ignoreFilePath}");
                 return new(Array.Empty<string>());
             }
 
             var lines = fileSystem.ReadAllLines(ignoreFilePath);
-            _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
+            _logger.Log(LogLevel.Verbose, $"Loaded {lines.Length} lines from ignore file");
 
             var ignoreMatcher = new GitignoreMatcher(lines);
 
             // Debug output for each ignored pattern
             foreach (var pattern in lines)
             {
-                _logger.Verbose($"Ignoring pattern: '{pattern}'");
+                _logger.Log(LogLevel.Verbose, $"Ignoring pattern: '{pattern}'");
             }
 
             return ignoreMatcher;

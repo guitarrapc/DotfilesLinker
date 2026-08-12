@@ -6,14 +6,14 @@ namespace DotfilesLinker.Tests;
 public class FileIgnoreEnhancedTests
 {
     private readonly IFileSystem _fileSystemMock;
-    private readonly ILogger _loggerMock;
+    private readonly TestLogger _logger;
     private readonly FileLinkerService _service;
 
     public FileIgnoreEnhancedTests()
     {
         _fileSystemMock = Substitute.For<IFileSystem>();
-        _loggerMock = Substitute.For<ILogger>();
-        _service = new FileLinkerService(_fileSystemMock, _loggerMock);
+        _logger = new TestLogger();
+        _service = new FileLinkerService(_fileSystemMock, _logger.Logger);
     }
 
     [Fact]
@@ -67,8 +67,8 @@ public class FileIgnoreEnhancedTests
         _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite, dryRun);
 
         // Assert - Verify attempt was made to create symlink only for .vimrc
-        _loggerMock.Received().Success(Arg.Is<string>(s => s.Contains(".vimrc")));
-        _loggerMock.DidNotReceive().Success(Arg.Is<string>(s => s.Contains(".bashrc")));
+        Assert.Contains($" -> {vimrcPath}", _logger.Output);
+        Assert.DoesNotContain($" -> {bashrcPath}", _logger.Output);
     }
 
     [Fact]
@@ -109,9 +109,9 @@ public class FileIgnoreEnhancedTests
         _service.LinkDotfiles(repoRoot, userHome, ignoreFileName, overwrite, dryRun);
 
         // Assert - Verify only app.json was not ignored
-        _loggerMock.Received().Verbose(Arg.Is<string>(s => s.Contains("app.json") && s.Contains("Linking")));
-        _loggerMock.DidNotReceive().Verbose(Arg.Is<string>(s => s.Contains("settings.json") && s.Contains("Linking")));
-        _loggerMock.DidNotReceive().Verbose(Arg.Is<string>(s => s.Contains("app.log") && s.Contains("Linking")));
+        Assert.Contains($"Linking {Path.Combine(homeDir, "config", "app.json")}", _logger.Output);
+        Assert.DoesNotContain($"Linking {Path.Combine(homeDir, "config", "settings.json")}", _logger.Output);
+        Assert.DoesNotContain($"Linking {Path.Combine(homeDir, "log", "app.log")}", _logger.Output);
     }
 
     [Fact]
@@ -167,6 +167,6 @@ public class FileIgnoreEnhancedTests
 
         // The actual ignore path is HOME/config/settings.json, so a repository-root pattern
         // without the HOME prefix must not match it.
-        _loggerMock.Received().Success(Arg.Is<string>(message => message.Contains(source)));
+        Assert.Contains(source, _logger.Output);
     }
 }

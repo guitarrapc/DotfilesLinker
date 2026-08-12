@@ -6,14 +6,14 @@ namespace DotfilesLinker.Tests;
 public class DryRunTests
 {
     private readonly IFileSystem _fileSystemMock;
-    private readonly ILogger _loggerMock;
+    private readonly TestLogger _logger;
     private readonly FileLinkerService _service;
 
     public DryRunTests()
     {
         _fileSystemMock = Substitute.For<IFileSystem>();
-        _loggerMock = Substitute.For<ILogger>();
-        _service = new FileLinkerService(_fileSystemMock, _loggerMock);
+        _logger = new TestLogger();
+        _service = new FileLinkerService(_fileSystemMock, _logger.Logger);
     }
 
     [Fact]
@@ -41,9 +41,9 @@ public class DryRunTests
         _fileSystemMock.DidNotReceive().CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>());
 
         // Verify that logger received messages with [DRY-RUN] prefix
-        _loggerMock.Received().Info("DRY RUN MODE: No files will be actually linked");
-        _loggerMock.Received().Info("DRY RUN COMPLETED: No files were actually linked");
-        _loggerMock.Received().Success(Arg.Is<string>(s => s.StartsWith("[DRY-RUN]")));
+        Assert.Contains("[i] DRY RUN MODE: No files will be actually linked", _logger.Output);
+        Assert.Contains("[i] DRY RUN COMPLETED: No files were actually linked", _logger.Output);
+        Assert.Contains("[o] [DRY-RUN]", _logger.Output);
     }
 
     [Fact]
@@ -77,9 +77,9 @@ public class DryRunTests
         _fileSystemMock.Received().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
 
         // Verify that logger did not receive messages with [DRY-RUN] prefix
-        _loggerMock.DidNotReceive().Info("DRY RUN MODE: No files will be actually linked");
-        _loggerMock.DidNotReceive().Info("DRY RUN COMPLETED: No files were actually linked");
-        _loggerMock.DidNotReceive().Success(Arg.Is<string>(s => s.StartsWith("[DRY-RUN]")));
+        Assert.DoesNotContain("DRY RUN MODE", _logger.Output);
+        Assert.DoesNotContain("DRY RUN COMPLETED", _logger.Output);
+        Assert.DoesNotContain("[DRY-RUN]", _logger.Output);
     }
 
     [Fact]
@@ -114,7 +114,7 @@ public class DryRunTests
         _fileSystemMock.DidNotReceive().Delete(Arg.Any<string>());
 
         // Verify that dry run logs were produced
-        _loggerMock.Received().Verbose(Arg.Is<string>(s => s.StartsWith("[DRY-RUN] Would replace")));
+        Assert.Contains("[v] [DRY-RUN] Would replace", _logger.Output);
     }
 
     [Fact]

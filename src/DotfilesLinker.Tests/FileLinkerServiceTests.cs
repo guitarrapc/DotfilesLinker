@@ -21,8 +21,8 @@ public class FileLinkerServiceTests
     {
         var repoRoot = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "empty-repository");
         var userHome = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "home");
-        var logger = Substitute.For<ILogger>();
-        var service = new FileLinkerService(_fileSystemMock, logger);
+        var logger = new TestLogger();
+        var service = new FileLinkerService(_fileSystemMock, logger.Logger);
 
         var summary = service.LinkDotfiles(
             repoRoot,
@@ -32,9 +32,8 @@ public class FileLinkerServiceTests
             dryRun);
 
         Assert.Equal(default, summary);
-        logger.Received(1).Error(Arg.Is<string>(message =>
-            message.Contains("No linkable dotfiles were found", StringComparison.Ordinal) &&
-            message.Contains("--root", StringComparison.Ordinal)));
+        Assert.Contains("No linkable dotfiles were found", logger.Error);
+        Assert.Contains("--root", logger.Error);
         _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>());
