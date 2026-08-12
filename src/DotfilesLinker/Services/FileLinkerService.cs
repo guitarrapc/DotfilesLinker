@@ -411,19 +411,20 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             return;
         }
 
-        foreach (var operation in operations)
-        {
-            if (operation.Disposition != LinkDisposition.Skip)
-            {
-                var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
-                _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
-                fileSystem.EnsureDirectory(targetDirectory);
-            }
-        }
-
+        var createdDirectories = new List<string>();
         var appliedOperations = new List<AppliedLinkOperation>(operations.Count);
         try
         {
+            foreach (var operation in operations)
+            {
+                if (operation.Disposition != LinkDisposition.Skip)
+                {
+                    var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
+                    _logger.Log(LogLevel.Verbose, $"Ensuring directory exists: {targetDirectory}");
+                    fileSystem.EnsureDirectory(targetDirectory, createdDirectories);
+                }
+            }
+
             foreach (var operation in operations)
             {
                 LogLinkOperation(operation);
@@ -438,7 +439,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             try
             {
-                RollbackAppliedOperations(appliedOperations);
+                RollbackLinkPlan(appliedOperations, createdDirectories);
             }
             catch (Exception rollbackException)
             {
@@ -467,7 +468,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             try
             {
-                RollbackAppliedOperations(appliedOperations);
+                RollbackLinkPlan(appliedOperations, createdDirectories);
             }
             catch (Exception rollbackException)
             {
@@ -604,6 +605,45 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
                 rollbackExceptions ??= [];
                 rollbackExceptions.Add(new IOException(
                     $"Failed to roll back destination '{operation.Operation.Target}'.",
+                    ex));
+            }
+        }
+
+        if (rollbackExceptions is not null)
+        {
+            throw new AggregateException(rollbackExceptions);
+        }
+    }
+
+    private void RollbackLinkPlan(
+        IReadOnlyList<AppliedLinkOperation> operations,
+        IReadOnlyList<string> createdDirectories)
+    {
+        List<Exception>? rollbackExceptions = null;
+        try
+        {
+            RollbackAppliedOperations(operations);
+        }
+        catch (Exception ex)
+        {
+            rollbackExceptions = [ex];
+        }
+
+        for (var index = createdDirectories.Count - 1; index >= 0; index--)
+        {
+            var directory = createdDirectories[index];
+            try
+            {
+                if (fileSystem.DirectoryExists(directory))
+                {
+                    fileSystem.Delete(directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                rollbackExceptions ??= [];
+                rollbackExceptions.Add(new IOException(
+                    $"Failed to remove directory '{directory}' created by the link plan.",
                     ex));
             }
         }

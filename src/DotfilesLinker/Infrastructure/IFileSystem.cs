@@ -92,10 +92,12 @@ internal interface IFileSystem
     IEnumerable<string> EnumerateDirectories(string root);
 
     /// <summary>
-    /// Creates a directory at the specified path if it does not already exist.
+    /// Creates a directory at the specified path if it does not already exist and records
+    /// each directory created by this call in parent-to-child order.
     /// </summary>
     /// <param name="path">The directory path to create.</param>
-    void EnsureDirectory(string path);
+    /// <param name="createdDirectories">Receives the directories created by this call.</param>
+    void EnsureDirectory(string path, IList<string> createdDirectories);
 
     /// <summary>
     /// Reads all lines from the specified file.

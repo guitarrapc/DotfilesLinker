@@ -34,7 +34,9 @@ public class FileLinkerServiceTests
         Assert.Equal(default, summary);
         Assert.Contains("No linkable dotfiles were found", logger.Error);
         Assert.Contains("--root", logger.Error);
-        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnsureDirectory(
+            Arg.Any<string>(),
+            Arg.Any<IList<string>>());
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>());
     }
@@ -185,7 +187,9 @@ public class FileLinkerServiceTests
         Assert.Throws<InvalidOperationException>(() =>
             _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
 
-        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnsureDirectory(
+            Arg.Any<string>(),
+            Arg.Any<IList<string>>());
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().Move(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().Delete(Arg.Any<string>());
@@ -211,7 +215,9 @@ public class FileLinkerServiceTests
 
         Assert.Contains("Destinations", exception.Message);
         _fileSystemMock.DidNotReceive().PathExists(target);
-        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnsureDirectory(
+            Arg.Any<string>(),
+            Arg.Any<IList<string>>());
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
     }
 
@@ -246,6 +252,43 @@ public class FileLinkerServiceTests
             _fileSystemMock.CreateFileSymlink(firstTarget, firstSource);
             _fileSystemMock.CreateFileSymlink(secondTarget, secondSource);
             _fileSystemMock.Delete(firstTarget);
+        });
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRemoveCreatedDirectoriesInReverseOrderWhenCreationFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "directory-rollback");
+        var repoRoot = Path.Combine(root, "repo");
+        var createdParent = Path.Combine(root, "new-home");
+        var userHome = Path.Combine(createdParent, "user");
+        var source = Path.Combine(repoRoot, ".settings");
+        var target = Path.Combine(userHome, ".settings");
+
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([source]);
+        _fileSystemMock.DirectoryExists(createdParent).Returns(true);
+        _fileSystemMock.DirectoryExists(userHome).Returns(true);
+        _fileSystemMock
+            .When(fs => fs.EnsureDirectory(userHome, Arg.Any<IList<string>>()))
+            .Do(call =>
+            {
+                var createdDirectories = call.ArgAt<IList<string>>(1);
+                createdDirectories.Add(createdParent);
+                createdDirectories.Add(userHome);
+            });
+        _fileSystemMock
+            .When(fs => fs.CreateFileSymlink(target, source))
+            .Do(_ => throw new IOException("creation failed"));
+
+        Assert.Throws<IOException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
+
+        Received.InOrder(() =>
+        {
+            _fileSystemMock.EnsureDirectory(userHome, Arg.Any<IList<string>>());
+            _fileSystemMock.CreateFileSymlink(target, source);
+            _fileSystemMock.Delete(userHome);
+            _fileSystemMock.Delete(createdParent);
         });
     }
 

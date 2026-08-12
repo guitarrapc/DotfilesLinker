@@ -141,7 +141,9 @@ public class DryRunTests
 
         // Assert
         // Verify that directories were not created
-        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnsureDirectory(
+            Arg.Any<string>(),
+            Arg.Any<IList<string>>());
 
         // Verify that symlinks were not created
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
