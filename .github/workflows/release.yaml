@@ -86,7 +86,7 @@ jobs:
         run: dotnet tool restore
       - name: dotnet publish (Native AOT)
         shell: bash
-        run: dotnet publish -c Release ./src/DotfilesLinker/ -r ${{ matrix.rid }} -p:Version="${VERSION}" -r ${{ matrix.rid }} --artifacts-path ./artifacts
+        run: dotnet publish -c Release ./src/DotfilesLinker/ -r ${{ matrix.rid }} --artifacts-path ./artifacts
         env:
           VERSION: ${{ needs.validate.outputs.version }}
       - name: Remove debug symbols
