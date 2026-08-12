@@ -31,6 +31,28 @@ public sealed class FileLinkerServiceIntegrationTests : IDisposable
         Assert.Equal("content", File.ReadAllText(Path.Combine(destinationLink, "external.txt")));
     }
 
+    [Fact]
+    public void LinkDotfiles_WithForceReplacesNonEmptyDirectoryAndRemovesBackup()
+    {
+        var repoRoot = Path.Combine(_root, "repo");
+        var userHome = Path.Combine(_root, "user-home");
+        var source = Path.Combine(repoRoot, ".settings");
+        var target = Path.Combine(userHome, ".settings");
+        var backup = target + ".dotfileslinker-backup";
+
+        Directory.CreateDirectory(repoRoot);
+        File.WriteAllText(source, "new settings");
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "existing.txt"), "existing settings");
+
+        var service = new FileLinkerService(new DefaultFileSystem());
+        service.LinkDotfiles(repoRoot, userHome, "dotfiles_ignore", overwrite: true);
+
+        Assert.Equal(source, new FileInfo(target).LinkTarget);
+        Assert.False(Directory.Exists(backup));
+        Assert.False(File.Exists(backup));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

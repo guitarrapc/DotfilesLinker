@@ -57,6 +57,44 @@ internal sealed class DefaultFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
+    public void DeleteBackup(string backupPath, string originalPath)
+    {
+        var fullBackupPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(backupPath));
+        var fullOriginalPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(originalPath));
+        var expectedBackupPath = fullOriginalPath + ".dotfileslinker-backup";
+
+        if (!IsGeneratedBackupPath(fullBackupPath, expectedBackupPath))
+        {
+            throw new InvalidOperationException(
+                $"Refusing to recursively delete '{backupPath}' because it is not a generated backup for '{originalPath}'.");
+        }
+
+        FileAttributes attributes;
+        try
+        {
+            attributes = File.GetAttributes(fullBackupPath);
+        }
+        catch (FileNotFoundException)
+        {
+            return;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return;
+        }
+
+        if ((attributes & FileAttributes.Directory) != 0)
+        {
+            Directory.Delete(
+                fullBackupPath,
+                recursive: (attributes & FileAttributes.ReparsePoint) == 0);
+            return;
+        }
+
+        File.Delete(fullBackupPath);
+    }
+
+    /// <inheritdoc/>
     public void Move(string sourcePath, string destinationPath)
     {
         var attributes = File.GetAttributes(sourcePath);
@@ -90,4 +128,28 @@ internal sealed class DefaultFileSystem : IFileSystem
 
     /// <inheritdoc/>
     public string[] ReadAllLines(string path) => File.ReadAllLines(path);
+
+    private static bool IsGeneratedBackupPath(string backupPath, string expectedBackupPath)
+    {
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        if (string.Equals(backupPath, expectedBackupPath, comparison))
+        {
+            return true;
+        }
+
+        var numberedPrefix = expectedBackupPath + ".";
+        if (!backupPath.StartsWith(numberedPrefix, comparison))
+        {
+            return false;
+        }
+
+        return uint.TryParse(
+                backupPath.AsSpan(numberedPrefix.Length),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var suffix) &&
+            suffix > 0;
+    }
 }

@@ -129,6 +129,48 @@ public sealed class FileSystemTests : IDisposable
     }
 
     [Fact]
+    public void DeleteBackup_RemovesNonEmptyDirectory()
+    {
+        var original = Path.Combine(_root, "settings");
+        var backup = original + ".dotfileslinker-backup";
+        Directory.CreateDirectory(backup);
+        File.WriteAllText(Path.Combine(backup, "existing.txt"), "content");
+
+        _fileSystem.DeleteBackup(backup, original);
+
+        Assert.False(Directory.Exists(backup));
+    }
+
+    [Fact]
+    public void DeleteBackup_RejectsPathNotGeneratedFromOriginalTarget()
+    {
+        var original = Path.Combine(_root, "settings");
+        var unrelated = Path.Combine(_root, "unrelated");
+        Directory.CreateDirectory(unrelated);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            _fileSystem.DeleteBackup(unrelated, original));
+        Assert.True(Directory.Exists(unrelated));
+    }
+
+    [Fact]
+    public void DeleteBackup_RemovesDirectoryLinkWithoutFollowingTarget()
+    {
+        var original = Path.Combine(_root, "settings");
+        var backup = original + ".dotfileslinker-backup";
+        var externalDirectory = Path.Combine(_root, "external");
+        Directory.CreateDirectory(externalDirectory);
+        var externalFile = Path.Combine(externalDirectory, "keep.txt");
+        File.WriteAllText(externalFile, "content");
+        Directory.CreateSymbolicLink(backup, externalDirectory);
+
+        _fileSystem.DeleteBackup(backup, original);
+
+        Assert.False(Directory.Exists(backup));
+        Assert.True(File.Exists(externalFile));
+    }
+
+    [Fact]
     public void Move_RenamesFileDirectoryAndSymbolicLink()
     {
         var file = CreateFile("move-file.txt");

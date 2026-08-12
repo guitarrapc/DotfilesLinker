@@ -457,7 +457,9 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             {
                 if (appliedOperation.BackupPath is not null)
                 {
-                    fileSystem.Delete(appliedOperation.BackupPath);
+                    fileSystem.DeleteBackup(
+                        appliedOperation.BackupPath,
+                        appliedOperation.Operation.Target);
                 }
             }
         }

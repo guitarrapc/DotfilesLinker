@@ -47,6 +47,14 @@ internal interface IFileSystem
     void Delete(string path);
 
     /// <summary>
+    /// Recursively deletes a replacement backup after verifying that its path was generated
+    /// from the original target path. Symbolic links are deleted without following them.
+    /// </summary>
+    /// <param name="backupPath">The generated backup path to delete.</param>
+    /// <param name="originalPath">The original target path from which the backup name was generated.</param>
+    void DeleteBackup(string backupPath, string originalPath);
+
+    /// <summary>
     /// Moves a file, directory, or symbolic link without following it.
     /// </summary>
     /// <param name="sourcePath">The existing entry to move.</param>

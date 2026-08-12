@@ -616,6 +616,7 @@ public class FileLinkerServiceTests
             _fileSystemMock.Move(backup, target);
         });
         _fileSystemMock.DidNotReceive().Delete(backup);
+        _fileSystemMock.DidNotReceive().DeleteBackup(backup, target);
     }
 
     [Fact]
@@ -637,7 +638,7 @@ public class FileLinkerServiceTests
         {
             _fileSystemMock.Move(target, backup);
             _fileSystemMock.CreateFileSymlink(target, source);
-            _fileSystemMock.Delete(backup);
+            _fileSystemMock.DeleteBackup(backup, target);
         });
     }
 
@@ -659,7 +660,7 @@ public class FileLinkerServiceTests
         _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true);
 
         _fileSystemMock.Received(1).Move(target, numberedBackup);
-        _fileSystemMock.Received(1).Delete(numberedBackup);
+        _fileSystemMock.Received(1).DeleteBackup(numberedBackup, target);
         _fileSystemMock.DidNotReceive().Move(target, backup);
     }
 
@@ -677,7 +678,7 @@ public class FileLinkerServiceTests
         _fileSystemMock.PathExists(target).Returns(_ => ++targetInspectionCount <= 2);
         _fileSystemMock.PathExists(backup).Returns(false);
         _fileSystemMock
-            .When(fs => fs.Delete(backup))
+            .When(fs => fs.DeleteBackup(backup, target))
             .Do(_ => throw new IOException("backup cleanup failed"));
 
         var exception = Assert.Throws<IOException>(() =>
@@ -688,7 +689,7 @@ public class FileLinkerServiceTests
         {
             _fileSystemMock.Move(target, backup);
             _fileSystemMock.CreateFileSymlink(target, source);
-            _fileSystemMock.Delete(backup);
+            _fileSystemMock.DeleteBackup(backup, target);
             _fileSystemMock.Delete(target);
             _fileSystemMock.Move(backup, target);
         });
