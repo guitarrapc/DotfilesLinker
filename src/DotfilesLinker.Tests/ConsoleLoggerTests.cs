@@ -29,4 +29,19 @@ public class ConsoleLoggerTests
         Assert.Equal($"[o] completed{Environment.NewLine}", standardOutput.ToString());
         Assert.Equal(string.Empty, standardError.ToString());
     }
+
+    [Fact]
+    public void Summary_ShouldWriteCountsToStandardOutput()
+    {
+        using var standardOutput = new StringWriter();
+        using var standardError = new StringWriter();
+        var logger = new ConsoleLogger(verbose: false, standardOutput, standardError);
+
+        logger.Summary(new LinkSummary(Created: 2, Replaced: 3, Skipped: 4));
+
+        Assert.Equal(
+            $"Created: 2, replaced: 3, skipped: 4{Environment.NewLine}",
+            standardOutput.ToString());
+        Assert.Equal(string.Empty, standardError.ToString());
+    }
 }

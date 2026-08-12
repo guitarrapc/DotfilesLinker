@@ -24,20 +24,50 @@ public class FileLinkerServiceTests
         var logger = Substitute.For<ILogger>();
         var service = new FileLinkerService(_fileSystemMock, logger);
 
-        var operationCount = service.LinkDotfiles(
+        var summary = service.LinkDotfiles(
             repoRoot,
             userHome,
             "dotfiles_ignore",
             overwrite: false,
             dryRun);
 
-        Assert.Equal(0, operationCount);
+        Assert.Equal(default, summary);
         logger.Received(1).Error(Arg.Is<string>(message =>
             message.Contains("No linkable dotfiles were found", StringComparison.Ordinal) &&
             message.Contains("--root", StringComparison.Ordinal)));
         _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
         _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
         _fileSystemMock.DidNotReceive().CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldReturnOperationSummary()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "summary", "repo");
+        var userHome = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "summary", "home");
+        var createSource = Path.Combine(repoRoot, ".create");
+        var replaceSource = Path.Combine(repoRoot, ".replace");
+        var skipSource = Path.Combine(repoRoot, ".skip");
+        var replaceTarget = Path.Combine(userHome, ".replace");
+        var skipTarget = Path.Combine(userHome, ".skip");
+
+        _fileSystemMock
+            .EnumerateFiles(repoRoot, ".*", false)
+            .Returns([createSource, replaceSource, skipSource]);
+        _fileSystemMock.PathExists(replaceTarget).Returns(true);
+        _fileSystemMock.PathExists(skipTarget).Returns(true);
+        _fileSystemMock.GetLinkTarget(replaceTarget).Returns("other-target");
+        _fileSystemMock.GetLinkTarget(skipTarget).Returns(skipSource);
+
+        var summary = _service.LinkDotfiles(
+            repoRoot,
+            userHome,
+            "dotfiles_ignore",
+            overwrite: true,
+            dryRun: true);
+
+        Assert.Equal(new LinkSummary(Created: 1, Replaced: 1, Skipped: 1), summary);
+        Assert.Equal(3, summary.Total);
     }
 
     [Fact]

@@ -49,14 +49,15 @@ try
     logger.Info($"Force overwrite: {options.ForceOverwrite}");
     logger.Info($"Dry run: {options.DryRun}");
 
-    var operationCount = svc.LinkDotfiles(
+    var summary = svc.LinkDotfiles(
         executionRoot,
         userHome,
         ignoreFileName,
         options.ForceOverwrite,
         options.DryRun);
+    logger.Summary(summary);
 
-    if (operationCount == 0)
+    if (summary.Total == 0)
     {
         Environment.ExitCode = 1;
         return;

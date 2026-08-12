@@ -3,6 +3,11 @@ using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Services;
 
+internal readonly record struct LinkSummary(int Created, int Replaced, int Skipped)
+{
+    public int Total => Created + Replaced + Skipped;
+}
+
 /// <summary>
 /// Provides functionality to link dotfiles from a repository to the user's home directory or system root.
 /// </summary>
@@ -51,7 +56,12 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <exception cref="InvalidOperationException">
     /// Thrown if a target file or directory already exists and <paramref name="overwrite"/> is <c>false</c>.
     /// </exception>
-    public int LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite, bool dryRun = false)
+    public LinkSummary LinkDotfiles(
+        string repoRoot,
+        string userHome,
+        string ignoreFileName,
+        bool overwrite,
+        bool dryRun = false)
     {
         if (!Path.IsPathRooted(repoRoot))
         {
@@ -93,10 +103,11 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             _logger.Error(
                 $"No linkable dotfiles were found in '{repoRoot}'. " +
                 "Verify the repository path with --root or run the command from the dotfiles repository.");
-            return 0;
+            return default;
         }
 
         var validatedOperations = ValidateLinkPlan(repoRoot, operations, overwrite);
+        var summary = CreateSummary(validatedOperations);
         ApplyLinkPlan(validatedOperations, dryRun);
 
         if (dryRun)
@@ -108,7 +119,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             _logger.Info("Dotfiles linking completed");
         }
 
-        return operations.Count;
+        return summary;
     }
 
     /*-----------------------------------------------------------
@@ -369,6 +380,31 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         }
 
         return validatedOperations;
+    }
+
+    private static LinkSummary CreateSummary(IReadOnlyList<ValidatedLinkOperation> operations)
+    {
+        var created = 0;
+        var replaced = 0;
+        var skipped = 0;
+
+        foreach (var operation in operations)
+        {
+            switch (operation.Disposition)
+            {
+                case LinkDisposition.Create:
+                    created++;
+                    break;
+                case LinkDisposition.Replace:
+                    replaced++;
+                    break;
+                case LinkDisposition.Skip:
+                    skipped++;
+                    break;
+            }
+        }
+
+        return new(created, replaced, skipped);
     }
 
     private void ApplyLinkPlan(IReadOnlyList<ValidatedLinkOperation> operations, bool dryRun)

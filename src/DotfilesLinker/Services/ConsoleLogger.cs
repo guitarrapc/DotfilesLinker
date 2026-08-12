@@ -50,6 +50,17 @@ internal class ConsoleLogger(
         }
     }
 
+    public void Summary(LinkSummary summary)
+    {
+        _output.Write("Created: ");
+        WriteInt32(_output, summary.Created);
+        _output.Write(", replaced: ");
+        WriteInt32(_output, summary.Replaced);
+        _output.Write(", skipped: ");
+        WriteInt32(_output, summary.Skipped);
+        _output.WriteLine();
+    }
+
     void WriteSuccess(string msg) => WriteColored(_output, "[o] ", msg, ConsoleColor.Green);
     void WriteError(string msg) => WriteColored(_error, "[x] ", msg, ConsoleColor.Red);
     void WriteInfo(string msg) => WriteColored(_output, "[i] ", msg, ConsoleColor.Cyan);
@@ -59,7 +70,8 @@ internal class ConsoleLogger(
     {
         if (!ReferenceEquals(writer, Console.Out) && !ReferenceEquals(writer, Console.Error))
         {
-            writer.WriteLine($"{prefix}{msg}");
+            writer.Write(prefix);
+            writer.WriteLine(msg);
             return;
         }
 
@@ -67,11 +79,19 @@ internal class ConsoleLogger(
         try
         {
             Console.ForegroundColor = color;
-            writer.WriteLine($"{prefix}{msg}");
+            writer.Write(prefix);
+            writer.WriteLine(msg);
         }
         finally
         {
             Console.ForegroundColor = prev;
         }
+    }
+
+    private static void WriteInt32(TextWriter writer, int value)
+    {
+        Span<char> buffer = stackalloc char[11];
+        _ = value.TryFormat(buffer, out var charsWritten);
+        writer.Write(buffer[..charsWritten]);
     }
 }
