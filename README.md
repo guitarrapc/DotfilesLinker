@@ -27,11 +27,12 @@ Fast C# Native AOT utility to create symbolic links from dotfiles to your home d
 2. Run executable file `DotfilesLinker` in your terminal.
 
 ```sh
+git clone https://github.com/guitarrapc/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
 # Safe mode, do not overwrite existing files
-$ DotfilesLinker
-
+DotfilesLinker --dry-run
 # use --force to overwrite destination files
-$ DotfilesLinker --force
+DotfilesLinker --force
 ```
 
 ## How It Works

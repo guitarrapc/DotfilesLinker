@@ -27,6 +27,9 @@ C# Native AOTで実装された高速な dotfiles シンボリックリンク作
 2. ターミナルで実行ファイル `DotfilesLinker` を実行します。
 
 ```sh
+git clone https://github.com/guitarrapc/dotfiles.git ~/.dotfiles
+cd ~/.dotfiles
+
 # 安全モード、既存ファイルを上書きしません
 $ DotfilesLinker
 
