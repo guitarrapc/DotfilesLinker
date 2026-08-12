@@ -1,324 +1,198 @@
-﻿using DotfilesLinker.Infrastructure;
+using DotfilesLinker.Infrastructure;
 
 namespace DotfilesLinker.Tests;
 
-public class FileSystemTests
+public sealed class FileSystemTests : IDisposable
 {
-    private readonly IFileSystem _fileSystemMock;
+    private readonly DefaultFileSystem _fileSystem = new();
+    private readonly string _root = Path.Combine(
+        Path.GetTempPath(),
+        $"DotfilesLinker-{Guid.NewGuid():N}");
 
     public FileSystemTests()
     {
-        _fileSystemMock = Substitute.For<IFileSystem>();
+        Directory.CreateDirectory(_root);
     }
 
     [Fact]
-    public void FileExists_ShouldReturnTrue_WhenFileExists()
+    public void FileExists_ReflectsActualFileSystemState()
     {
-        // Arrange
-        var filePath = "test.txt";
-        _fileSystemMock.FileExists(filePath).Returns(true);
+        var path = Path.Combine(_root, "file.txt");
 
-        // Act
-        var result = _fileSystemMock.FileExists(filePath);
+        Assert.False(_fileSystem.FileExists(path));
 
-        // Assert
-        Assert.True(result);
+        File.WriteAllText(path, "content");
+
+        Assert.True(_fileSystem.FileExists(path));
     }
 
     [Fact]
-    public void DirectoryExists_ShouldReturnFalse_WhenDirectoryDoesNotExist()
+    public void DirectoryExists_ReflectsActualFileSystemState()
     {
-        // Arrange
-        var directoryPath = "nonexistent";
-        _fileSystemMock.DirectoryExists(directoryPath).Returns(false);
+        var path = Path.Combine(_root, "directory");
 
-        // Act
-        var result = _fileSystemMock.DirectoryExists(directoryPath);
+        Assert.False(_fileSystem.DirectoryExists(path));
 
-        // Assert
-        Assert.False(result);
+        Directory.CreateDirectory(path);
+
+        Assert.True(_fileSystem.DirectoryExists(path));
     }
 
     [Fact]
-    public void GetLinkTarget_ShouldReturnCorrectTarget()
+    public void EnsureDirectory_CreatesDirectoryAndIsIdempotent()
     {
-        // Arrange
-        var linkPath = "link";
-        var targetPath = "target";
-        _fileSystemMock.GetLinkTarget(linkPath).Returns(targetPath);
+        var path = Path.Combine(_root, "parent", "child");
 
-        // Act
-        var result = _fileSystemMock.GetLinkTarget(linkPath);
+        _fileSystem.EnsureDirectory(path);
+        _fileSystem.EnsureDirectory(path);
 
-        // Assert
-        Assert.Equal(targetPath, result);
+        Assert.True(Directory.Exists(path));
     }
 
     [Fact]
-    public void Delete_ShouldInvokeDeleteMethod()
+    public void ReadAllLines_ReadsActualFileAndThrowsForMissingFile()
     {
-        // Arrange
-        var path = "fileToDelete.txt";
+        var path = Path.Combine(_root, "lines.txt");
+        string[] expected = ["line1", "line2", "line3"];
+        File.WriteAllLines(path, expected);
 
-        // Act
-        _fileSystemMock.Delete(path);
-
-        // Assert
-        _fileSystemMock.Received(1).Delete(path);
+        Assert.Equal(expected, _fileSystem.ReadAllLines(path));
+        Assert.Throws<FileNotFoundException>(() =>
+            _fileSystem.ReadAllLines(Path.Combine(_root, "missing.txt")));
     }
 
     [Fact]
-    public void CreateFileSymlink_ShouldInvokeWithCorrectParameters()
+    public void EnumerateFiles_HonorsPatternAndRecursion()
     {
-        // Arrange
-        var linkPath = "link";
-        var targetPath = "target";
+        var nested = Path.Combine(_root, "nested");
+        Directory.CreateDirectory(nested);
+        var rootText = CreateFile("root.txt");
+        CreateFile("root.json");
+        var nestedText = CreateFile(Path.Combine("nested", "nested.txt"));
 
-        // Act
-        _fileSystemMock.CreateFileSymlink(linkPath, targetPath);
+        var topLevel = _fileSystem.EnumerateFiles(_root, "*.txt", recursive: false).ToHashSet();
+        var recursive = _fileSystem.EnumerateFiles(_root, "*.txt", recursive: true).ToHashSet();
 
-        // Assert
-        _fileSystemMock.Received(1).CreateFileSymlink(linkPath, targetPath);
+        Assert.Equal([rootText], topLevel);
+        Assert.Equal(2, recursive.Count);
+        Assert.Contains(rootText, recursive);
+        Assert.Contains(nestedText, recursive);
     }
 
     [Fact]
-    public void EnumerateFiles_ShouldReturnCorrectFileList()
+    public void EnumerateDirectories_ReturnsImmediateChildrenOnly()
     {
-        // Arrange
-        var root = "root";
-        var pattern = "*.txt";
-        var recursive = true;
-        var files = new List<string> { "file1.txt", "file2.txt" };
-        _fileSystemMock.EnumerateFiles(root, pattern, recursive).Returns(files);
+        var first = Path.Combine(_root, "first");
+        var second = Path.Combine(_root, "second");
+        var nested = Path.Combine(first, "nested");
+        Directory.CreateDirectory(nested);
+        Directory.CreateDirectory(second);
 
-        // Act
-        var result = _fileSystemMock.EnumerateFiles(root, pattern, recursive);
+        var directories = _fileSystem.EnumerateDirectories(_root).ToHashSet();
 
-        // Assert
-        Assert.Equal(files, result);
+        Assert.Equal(2, directories.Count);
+        Assert.Contains(first, directories);
+        Assert.Contains(second, directories);
+        Assert.DoesNotContain(nested, directories);
     }
 
     [Fact]
-    public void CreateDirectorySymlink_ShouldThrowException_WhenPathsAreInvalid()
+    public void Delete_RemovesFileAndEmptyDirectoryAndIgnoresMissingPath()
     {
-        // Arrange
-        string invalidLinkPath = "";
-        string invalidTargetPath = "";
+        var file = CreateFile("delete.txt");
+        var directory = Path.Combine(_root, "empty");
+        Directory.CreateDirectory(directory);
 
-        // Configure the mock
-        _fileSystemMock
-            .When(fs => fs.CreateDirectorySymlink(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(call =>
-            {
-                var linkPath = call.ArgAt<string>(0);
-                var targetPath = call.ArgAt<string>(1);
+        _fileSystem.Delete(file);
+        _fileSystem.Delete(directory);
+        var exception = Record.Exception(() =>
+            _fileSystem.Delete(Path.Combine(_root, "missing")));
 
-                if (string.IsNullOrWhiteSpace(linkPath) || string.IsNullOrWhiteSpace(targetPath))
-                {
-                    throw new ArgumentException("Invalid path(s) provided.");
-                }
-            });
-
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() =>
-            _fileSystemMock.CreateDirectorySymlink(invalidLinkPath, invalidTargetPath));
-    }
-
-    [Fact]
-    public void EnumerateFiles_ShouldHandleComplexPattern()
-    {
-        // Arrange
-        var root = "root";
-        var pattern = "[a-c]*.txt"; // 複雑なパターン
-        var recursive = true;
-        var expectedFiles = new List<string> { "root/a.txt", "root/b123.txt", "root/c.txt" };
-        _fileSystemMock.EnumerateFiles(root, pattern, recursive).Returns(expectedFiles);
-
-        // Act
-        var result = _fileSystemMock.EnumerateFiles(root, pattern, recursive);
-
-        // Assert
-        Assert.Equal(expectedFiles, result);
-    }
-
-    [Fact]
-    public void EnsureDirectory_ShouldInvokeEnsureDirectoryMethod()
-    {
-        // Arrange
-        var directoryPath = "newDirectory";
-
-        // Act
-        _fileSystemMock.EnsureDirectory(directoryPath);
-
-        // Assert
-        _fileSystemMock.Received(1).EnsureDirectory(directoryPath);
-    }
-
-    [Fact]
-    public void FileExists_ShouldReturnFalse_WhenPathIsInvalid()
-    {
-        // Arrange
-        string invalidPath = "";
-
-        // Act
-        var result = _fileSystemMock.FileExists(invalidPath);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void DirectoryExists_ShouldReturnFalse_WhenPathIsInvalid()
-    {
-        // Arrange
-        string invalidPath = "";
-
-        // Act
-        var result = _fileSystemMock.DirectoryExists(invalidPath);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void GetLinkTarget_ShouldReturnNull_WhenPathIsNotSymlink()
-    {
-        // Arrange
-        string nonSymlinkPath = "regularFile.txt";
-        _fileSystemMock.GetLinkTarget(nonSymlinkPath).Returns((string?)null);
-
-        // Act
-        var result = _fileSystemMock.GetLinkTarget(nonSymlinkPath);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void Delete_ShouldNotThrow_WhenPathDoesNotExist()
-    {
-        // Arrange
-        string nonexistentPath = "nonexistentFile.txt";
-
-        // Act & Assert
-        var exception = Record.Exception(() => _fileSystemMock.Delete(nonexistentPath));
+        Assert.False(File.Exists(file));
+        Assert.False(Directory.Exists(directory));
         Assert.Null(exception);
     }
 
     [Fact]
-    public void CreateFileSymlink_ShouldThrowException_WhenPathsAreInvalid()
+    public void CreateFileSymlink_CreatesLinkAndReportsTarget()
     {
-        // Arrange
-        string invalidLinkPath = "";
-        string invalidTargetPath = ""; // if null is specified, exception is thrown without mock
+        var target = CreateFile(Path.Combine("targets", "file.txt"));
+        var link = Path.Combine(_root, "file-link.txt");
 
-        // Configure the mock to throw an exception for invalid arguments
-        _fileSystemMock
-            .When(fs => fs.CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>()))
-            .Do(call =>
-            {
-                var linkPath = call.ArgAt<string>(0);
-                var targetPath = call.ArgAt<string>(1);
+        _fileSystem.CreateFileSymlink(link, target);
 
-                if (string.IsNullOrWhiteSpace(linkPath) || string.IsNullOrWhiteSpace(targetPath))
-                {
-                    throw new ArgumentException("Invalid path(s) provided.");
-                }
-            });
-
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => _fileSystemMock.CreateFileSymlink(invalidLinkPath, invalidTargetPath));
+        Assert.True(_fileSystem.FileExists(link));
+        Assert.Equal(target, _fileSystem.GetLinkTarget(link));
+        Assert.Equal("content", File.ReadAllText(link));
     }
 
     [Fact]
-    public void EnumerateFiles_ShouldReturnEmpty_WhenRootPathIsInvalid()
+    public void GetLinkTarget_PreservesRelativeFileLinkTarget()
     {
-        // Arrange
-        string invalidRoot = "";
-        _fileSystemMock.EnumerateFiles(invalidRoot, "*.txt", true).Returns(Enumerable.Empty<string>());
+        var target = CreateFile(Path.Combine("targets", "relative.txt"));
+        var linksDirectory = Path.Combine(_root, "links");
+        Directory.CreateDirectory(linksDirectory);
+        var link = Path.Combine(linksDirectory, "relative-link.txt");
+        var relativeTarget = Path.GetRelativePath(linksDirectory, target);
 
-        // Act
-        var result = _fileSystemMock.EnumerateFiles(invalidRoot, "*.txt", true);
+        _fileSystem.CreateFileSymlink(link, relativeTarget);
 
-        // Assert
-        Assert.Empty(result);
+        Assert.Equal(relativeTarget, _fileSystem.GetLinkTarget(link));
+        Assert.Equal("content", File.ReadAllText(link));
     }
 
     [Fact]
-    public void DefaultFileSystem_EnumerateDirectories_ReturnsImmediateChildrenOnly()
+    public void CreateDirectorySymlink_CreatesLinkAndReportsTarget()
     {
-        var root = Path.Combine(Path.GetTempPath(), $"DotfilesLinker-{Guid.NewGuid():N}");
-        var first = Path.Combine(root, "first");
-        var second = Path.Combine(root, "second");
-        var nested = Path.Combine(first, "nested");
+        var target = Path.Combine(_root, "target-directory");
+        Directory.CreateDirectory(target);
+        File.WriteAllText(Path.Combine(target, "file.txt"), "content");
+        var link = Path.Combine(_root, "directory-link");
 
-        try
+        _fileSystem.CreateDirectorySymlink(link, target);
+
+        Assert.True(_fileSystem.DirectoryExists(link));
+        Assert.Equal(target, _fileSystem.GetLinkTarget(link));
+        Assert.Equal("content", File.ReadAllText(Path.Combine(link, "file.txt")));
+    }
+
+    [Fact]
+    public void Delete_RemovesSymbolicLinkWithoutDeletingTarget()
+    {
+        var target = CreateFile(Path.Combine("targets", "preserved.txt"));
+        var link = Path.Combine(_root, "preserved-link.txt");
+        _fileSystem.CreateFileSymlink(link, target);
+
+        _fileSystem.Delete(link);
+
+        Assert.False(File.Exists(link));
+        Assert.True(File.Exists(target));
+    }
+
+    [Fact]
+    public void GetLinkTarget_ReturnsNullForRegularFileAndDirectory()
+    {
+        var file = CreateFile("regular.txt");
+        var directory = Path.Combine(_root, "regular-directory");
+        Directory.CreateDirectory(directory);
+
+        Assert.Null(_fileSystem.GetLinkTarget(file));
+        Assert.Null(_fileSystem.GetLinkTarget(directory));
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_root))
         {
-            Directory.CreateDirectory(nested);
-            Directory.CreateDirectory(second);
-
-            var directories = new DefaultFileSystem().EnumerateDirectories(root).ToHashSet();
-
-            Assert.Equal(2, directories.Count);
-            Assert.Contains(first, directories);
-            Assert.Contains(second, directories);
-            Assert.DoesNotContain(nested, directories);
-        }
-        finally
-        {
-            if (Directory.Exists(root))
-            {
-                Directory.Delete(root, recursive: true);
-            }
+            Directory.Delete(_root, recursive: true);
         }
     }
 
-    [Fact]
-    public void EnsureDirectory_ShouldThrowException_WhenPathIsInvalid()
+    private string CreateFile(string relativePath)
     {
-        // Arrange
-        string invalidPath = ""; // if null is specified, exception is thrown without mock
-
-        // Configure the mock to throw an exception for invalid arguments
-        _fileSystemMock
-            .When(fs => fs.EnsureDirectory(Arg.Any<string>()))
-            .Do(call =>
-            {
-                var path = call.ArgAt<string>(0);
-
-                if (string.IsNullOrWhiteSpace(path))
-                {
-                    throw new ArgumentException("Invalid path provided.");
-                }
-            });
-
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => _fileSystemMock.EnsureDirectory(invalidPath));
-    }
-
-    [Fact]
-    public void ReadAllLines_ShouldReturnLinesFromFile()
-    {
-        // Arrange
-        var filePath = "test.txt";
-        var expectedLines = new[] { "line1", "line2", "line3" };
-        _fileSystemMock.ReadAllLines(filePath).Returns(expectedLines);
-
-        // Act
-        var result = _fileSystemMock.ReadAllLines(filePath);
-
-        // Assert
-        Assert.Equal(expectedLines, result);
-    }
-
-    [Fact]
-    public void ReadAllLines_ShouldThrow_WhenFileDoesNotExist()
-    {
-        // Arrange
-        var nonExistentFilePath = "nonexistent.txt";
-        _fileSystemMock.ReadAllLines(nonExistentFilePath).Returns(x => throw new FileNotFoundException());
-
-        // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => _fileSystemMock.ReadAllLines(nonExistentFilePath));
+        var path = Path.Combine(_root, relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, "content");
+        return path;
     }
 }
