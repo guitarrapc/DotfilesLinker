@@ -5,7 +5,7 @@ using System.Reflection;
 // parse args
 bool showHelp = args.Any(a => a.Equals("--help", StringComparison.OrdinalIgnoreCase) || a.Equals("-h", StringComparison.OrdinalIgnoreCase));
 bool showVersion = args.Any(a => a.Equals("--version", StringComparison.OrdinalIgnoreCase));
-bool forceOverwrite = args.Any(a => a.Equals("--force=y", StringComparison.OrdinalIgnoreCase));
+bool forceOverwrite = args.Any(a => a.Equals("--force", StringComparison.OrdinalIgnoreCase));
 bool verbose = args.Any(a => a.Equals("--verbose", StringComparison.OrdinalIgnoreCase) || a.Equals("-v", StringComparison.OrdinalIgnoreCase));
 bool dryRun = args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase) || a.Equals("-d", StringComparison.OrdinalIgnoreCase));
 
@@ -88,7 +88,7 @@ static void DisplayHelp()
 
         Options:
           --help, -h         Display this help message
-          --force=y          Overwrite existing files or directories
+          --force            Overwrite existing files or directories
           --verbose, -v      Display detailed information during execution
           --version          Display version information
           --dry-run, -d      Simulate the operations without making any changes
@@ -113,7 +113,7 @@ static void DisplayHelp()
 
         Examples:
           {{appName}}              # Link dotfiles using default settings
-          {{appName}} --force=y    # Overwrite any existing files
+          {{appName}} --force      # Overwrite any existing files
           {{appName}} --verbose    # Show detailed information
           {{appName}} --dry-run    # Simulate the operations
         """);

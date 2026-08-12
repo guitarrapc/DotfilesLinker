@@ -276,7 +276,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             if (!overwrite)
             {
                 _logger.Verbose($"Target {normalizedTarget} exists and overwrite=false, aborting");
-                throw new InvalidOperationException($"'{normalizedTarget}' already exists; use --force=y to overwrite.");
+                throw new InvalidOperationException($"'{normalizedTarget}' already exists; use --force to overwrite.");
             }
 
             if (dryRun)

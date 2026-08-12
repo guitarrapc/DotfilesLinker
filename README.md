@@ -30,8 +30,8 @@ Fast C# Native AOT utility to create symbolic links from dotfiles to your home d
 # Safe mode, do not overwrite existing files
 $ DotfilesLinker
 
-# use --force=y to overwrite destination files
-$ DotfilesLinker --force=y
+# use --force to overwrite destination files
+$ DotfilesLinker --force
 ```
 
 ## How It Works
@@ -134,10 +134,10 @@ dotefiles
 
 </details>
 
-2. Run the DotfilesLinker command. The `--force=y` option is required to overwrite existing files.
+2. Run the DotfilesLinker command. The `--force` option is required to overwrite existing files.
 
 ```sh
-$ DotfilesLinker --force=y
+$ DotfilesLinker --force
 [o] Skipping already linked: C:\Users\guitarrapc\.textlintrc.json -> D:\github\guitarrapc\dotfiles-win\.textlintrc.json
 [o] Skipping already linked: C:\Users\guitarrapc\.wslconfig -> D:\github\guitarrapc\dotfiles-win\.wslconfig
 [o] Skipping already linked: C:\Users\guitarrapc\.ssh\config -> D:\github\guitarrapc\dotfiles-win\HOME\.ssh\config
@@ -209,7 +209,7 @@ All options are optional. The default behavior is to create symbolic links for a
 | --- | --- |
 | `--help`, `-h` | Display help information |
 | `--version` | Display version information |
-| `--force=y` | Overwrite existing files or directories |
+| `--force` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
 | `--dry-run`, `-d` | Simulate operations without making any changes to the filesystem |
 
@@ -233,7 +233,7 @@ export DOTFILES_ROOT=/path/to/my/dotfiles
 export DOTFILES_HOME=/custom/home/path
 
 # Run with custom settings
-DotfilesLinker --force=y
+DotfilesLinker --force
 ```
 
 ### dotfiles_ignore File

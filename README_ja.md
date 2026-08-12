@@ -30,8 +30,8 @@ C# Native AOTで実装された高速な dotfiles シンボリックリンク作
 # 安全モード、既存ファイルを上書きしません
 $ DotfilesLinker
 
-# --force=y オプションで既存ファイルを上書き
-$ DotfilesLinker --force=y
+# --force オプションで既存ファイルを上書き
+$ DotfilesLinker --force
 ```
 
 ## 動作原理
@@ -134,10 +134,10 @@ dotefiles
 
 </details>
 
-2. DotfilesLinkerコマンドを実行します。既存のファイルを上書きするには `--force=y` オプションが必要です。
+2. DotfilesLinkerコマンドを実行します。既存のファイルを上書きするには `--force` オプションが必要です。
 
 ```sh
-$ DotfilesLinker --force=y
+$ DotfilesLinker --force
 [o] Skipping already linked: C:\Users\guitarrapc\.textlintrc.json -> D:\github\guitarrapc\dotfiles-win\.textlintrc.json
 [o] Skipping already linked: C:\Users\guitarrapc\.wslconfig -> D:\github\guitarrapc\dotfiles-win\.wslconfig
 [o] Skipping already linked: C:\Users\guitarrapc\.ssh\config -> D:\github\guitarrapc\dotfiles-win\HOME\.ssh\config
@@ -209,7 +209,7 @@ DotfilesLinker --help
 | --- | --- |
 | `--help`, `-h` | ヘルプ情報を表示 |
 | `--version` | バージョン情報を表示 |
-| `--force=y` | 既存のファイルやディレクトリを上書き |
+| `--force` | 既存のファイルやディレクトリを上書き |
 | `--verbose`, `-v` | 実行中の詳細情報を表示 |
 | `--dry-run`, `-d` | ファイルシステムに変更を加えずに処理をシミュレーション |
 
@@ -233,7 +233,7 @@ export DOTFILES_ROOT=/path/to/my/dotfiles
 export DOTFILES_HOME=/custom/home/path
 
 # カスタム設定で実行
-DotfilesLinker --force=y
+DotfilesLinker --force
 ```
 
 ### dotfiles_ignore ファイル
