@@ -101,7 +101,7 @@ public class FileLinkerServiceTests
 
         var filesInHome = new[] { "/repo/HOME/.config/file1", "/repo/HOME/.config/file2" };
         _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
-        _fileSystemMock.EnumerateFiles(homeRoot, "*", true).Returns(filesInHome);
+        _fileSystemMock.EnumerateFiles(homeRoot, "*", false).Returns(filesInHome);
         _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);
 
         // Act
@@ -202,7 +202,7 @@ public class FileLinkerServiceTests
         };
 
         _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
-        _fileSystemMock.EnumerateFiles(homeRoot, "*", true).Returns(filesInHome);
+        _fileSystemMock.EnumerateFiles(homeRoot, "*", false).Returns(filesInHome);
         _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);
 
         // Mock GetRelativePath behavior

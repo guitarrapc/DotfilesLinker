@@ -185,33 +185,16 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         }
 
         _logger.Info($"Processing {srcDir} directory: {srcPath}");
-        var allFiles = fileSystem.EnumerateFiles(srcPath, "*", recursive: true).ToList();
-
-        // Filter files based on ignore patterns
         var files = new List<string>();
-        var ignoredFiles = new List<string>();
+        var ignoredPaths = new List<string>();
+        CollectFiles(repoRoot, srcPath, ignoreMatcher, files, ignoredPaths);
 
-        foreach (var file in allFiles)
+        if (ignoredPaths.Count > 0)
         {
-            var relPath = Path.GetRelativePath(repoRoot, file);
-
-            if (ShouldIgnorePath(relPath, isDirectory: false, ignoreMatcher))
+            _logger.Info($"Ignoring {ignoredPaths.Count} paths from {srcDir} directory based on ignore patterns:");
+            foreach (var path in ignoredPaths)
             {
-                ignoredFiles.Add(file);
-            }
-            else
-            {
-                files.Add(file);
-            }
-        }
-
-        // Log ignored files
-        if (ignoredFiles.Any())
-        {
-            _logger.Info($"Ignoring {ignoredFiles.Count} files from {srcDir} directory based on ignore patterns:");
-            foreach (var file in ignoredFiles)
-            {
-                _logger.Verbose($"  Ignored file: {file} (matched ignore pattern)");
+                _logger.Verbose($"  Ignored path: {path} (matched ignore pattern)");
             }
         }
 
@@ -233,6 +216,48 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
             _logger.Verbose($"Linking {file} to {dst}");
             LinkFile(file, dst, overwrite, dryRun);
+        }
+    }
+
+    /// <summary>
+    /// Collects linkable files without descending into ignored directories.
+    /// </summary>
+    private void CollectFiles(
+        string repoRoot,
+        string sourceRoot,
+        GitignoreMatcher ignoreMatcher,
+        List<string> files,
+        List<string> ignoredPaths)
+    {
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(sourceRoot);
+
+        while (pendingDirectories.TryPop(out var currentDirectory))
+        {
+            foreach (var directory in fileSystem.EnumerateDirectories(currentDirectory))
+            {
+                var relativePath = Path.GetRelativePath(repoRoot, directory);
+                if (ShouldIgnorePath(relativePath, isDirectory: true, ignoreMatcher))
+                {
+                    ignoredPaths.Add(directory);
+                    continue;
+                }
+
+                pendingDirectories.Push(directory);
+            }
+
+            foreach (var file in fileSystem.EnumerateFiles(currentDirectory, "*", recursive: false))
+            {
+                var relativePath = Path.GetRelativePath(repoRoot, file);
+                if (ShouldIgnorePath(relativePath, isDirectory: false, ignoreMatcher))
+                {
+                    ignoredPaths.Add(file);
+                }
+                else
+                {
+                    files.Add(file);
+                }
+            }
         }
     }
 

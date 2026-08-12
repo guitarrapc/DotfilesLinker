@@ -34,7 +34,7 @@ public class FileLinkerServicePatternTests
                 : [source]);
         fileSystem.DirectoryExists(homeRoot).Returns(
             repositoryPath.StartsWith("HOME/", StringComparison.Ordinal));
-        fileSystem.EnumerateFiles(homeRoot, "*", true).Returns(
+        fileSystem.EnumerateFiles(homeRoot, "*", false).Returns(
             repositoryPath.StartsWith("HOME/", StringComparison.Ordinal)
                 ? [source]
                 : Array.Empty<string>());

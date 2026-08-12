@@ -36,6 +36,10 @@ public sealed class DefaultFileSystem : IFileSystem
         Directory.EnumerateFiles(root, pattern, recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly);
 
     /// <inheritdoc/>
+    public IEnumerable<string> EnumerateDirectories(string root) =>
+        Directory.EnumerateDirectories(root, "*", SearchOption.TopDirectoryOnly);
+
+    /// <inheritdoc/>
     public void EnsureDirectory(string p) => Directory.CreateDirectory(p);
 
     /// <inheritdoc/>

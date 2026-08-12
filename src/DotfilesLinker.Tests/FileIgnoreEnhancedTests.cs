@@ -84,7 +84,7 @@ public class FileIgnoreEnhancedTests
 
         // Setup mock for HOME directory structure
         _fileSystemMock.DirectoryExists(homeDir).Returns(true);
-        _fileSystemMock.EnumerateFiles(homeDir, "*", true)
+        _fileSystemMock.EnumerateFiles(homeDir, "*", false)
             .Returns(new[] {
                 Path.Combine(homeDir, "config", "app.json"),
                 Path.Combine(homeDir, "config", "settings.json"),
@@ -112,5 +112,32 @@ public class FileIgnoreEnhancedTests
         _loggerMock.Received().Verbose(Arg.Is<string>(s => s.Contains("app.json") && s.Contains("Linking")));
         _loggerMock.DidNotReceive().Verbose(Arg.Is<string>(s => s.Contains("settings.json") && s.Contains("Linking")));
         _loggerMock.DidNotReceive().Verbose(Arg.Is<string>(s => s.Contains("app.log") && s.Contains("Linking")));
+    }
+
+    [Fact]
+    public void LinkDotfiles_DoesNotDescendIntoIgnoredDirectory()
+    {
+        var repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
+        var homeDir = Path.Combine(repoRoot, "HOME");
+        var cacheDir = Path.Combine(homeDir, "cache");
+        var ignoreFileName = ".linkignore";
+        var ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
+
+        _fileSystemMock.DirectoryExists(homeDir).Returns(true);
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(Array.Empty<string>());
+        _fileSystemMock.EnumerateDirectories(homeDir).Returns([cacheDir]);
+        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(["HOME/cache/"]);
+
+        _service.LinkDotfiles(
+            repoRoot,
+            Path.Combine(Path.DirectorySeparatorChar.ToString(), "home"),
+            ignoreFileName,
+            overwrite: false,
+            dryRun: true);
+
+        _fileSystemMock.Received(1).EnumerateDirectories(homeDir);
+        _fileSystemMock.DidNotReceive().EnumerateDirectories(cacheDir);
+        _fileSystemMock.DidNotReceive().EnumerateFiles(cacheDir, Arg.Any<string>(), Arg.Any<bool>());
     }
 }

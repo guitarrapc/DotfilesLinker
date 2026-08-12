@@ -56,6 +56,13 @@ public interface IFileSystem
     IEnumerable<string> EnumerateFiles(string root, string pattern, bool recursive);
 
     /// <summary>
+    /// Enumerates the immediate child directories of a specified directory.
+    /// </summary>
+    /// <param name="root">The directory to search.</param>
+    /// <returns>An enumerable collection of child directory paths.</returns>
+    IEnumerable<string> EnumerateDirectories(string root);
+
+    /// <summary>
     /// Creates a directory at the specified path if it does not already exist.
     /// </summary>
     /// <param name="path">The directory path to create.</param>

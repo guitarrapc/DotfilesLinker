@@ -133,7 +133,7 @@ public class DryRunTests
 
         _fileSystemMock.DirectoryExists(Arg.Is<string>(s => s.Contains("/repo"))).Returns(true);
         _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
-        _fileSystemMock.EnumerateFiles(homeRoot, "*", true).Returns(filesInHome);
+        _fileSystemMock.EnumerateFiles(homeRoot, "*", false).Returns(filesInHome);
         _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);
 
         // Act

@@ -245,6 +245,35 @@ public class FileSystemTests
     }
 
     [Fact]
+    public void DefaultFileSystem_EnumerateDirectories_ReturnsImmediateChildrenOnly()
+    {
+        var root = Path.Combine(Path.GetTempPath(), $"DotfilesLinker-{Guid.NewGuid():N}");
+        var first = Path.Combine(root, "first");
+        var second = Path.Combine(root, "second");
+        var nested = Path.Combine(first, "nested");
+
+        try
+        {
+            Directory.CreateDirectory(nested);
+            Directory.CreateDirectory(second);
+
+            var directories = new DefaultFileSystem().EnumerateDirectories(root).ToHashSet();
+
+            Assert.Equal(2, directories.Count);
+            Assert.Contains(first, directories);
+            Assert.Contains(second, directories);
+            Assert.DoesNotContain(nested, directories);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void EnsureDirectory_ShouldThrowException_WhenPathIsInvalid()
     {
         // Arrange
