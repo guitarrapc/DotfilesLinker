@@ -1,4 +1,4 @@
-using DotfilesLinker.Utilities;
+﻿using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Tests;
 

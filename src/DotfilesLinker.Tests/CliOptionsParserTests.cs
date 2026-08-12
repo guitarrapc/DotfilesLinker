@@ -1,4 +1,4 @@
-using DotfilesLinker.Services;
+﻿using DotfilesLinker.Services;
 
 namespace DotfilesLinker.Tests;
 

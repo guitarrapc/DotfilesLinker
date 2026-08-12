@@ -1,4 +1,4 @@
-namespace DotfilesLinker.Services;
+﻿namespace DotfilesLinker.Services;
 
 /// <summary>
 /// Matches a single path segment using gitignore-style wildcards.

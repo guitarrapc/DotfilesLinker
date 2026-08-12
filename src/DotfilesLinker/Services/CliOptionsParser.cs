@@ -1,4 +1,4 @@
-namespace DotfilesLinker.Services;
+﻿namespace DotfilesLinker.Services;
 
 internal readonly record struct CliOptions(
     bool ShowHelp = false,
