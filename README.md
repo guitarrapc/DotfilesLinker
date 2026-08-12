@@ -357,9 +357,7 @@ Use the [GitHub CLI](https://cli.github.com/) to verify that an archive was prod
 gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker
 
 # Verify the SPDX SBOM attestation
-gh attestation verify DotfilesLinker_win_amd64.zip \
-  --repo guitarrapc/DotfilesLinker \
-  --predicate-type https://spdx.dev/Document/v2.2
+gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker --predicate-type https://spdx.dev/Document/v2.2
 ```
 
 A successful verification confirms that the archive matches an attestation signed by this repository's GitHub Actions workflow.

@@ -358,9 +358,7 @@ Gitとの差異・未対応の挙動：
 gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker
 
 # SPDX SBOM Attestationを検証
-gh attestation verify DotfilesLinker_win_amd64.zip \
-  --repo guitarrapc/DotfilesLinker \
-  --predicate-type https://spdx.dev/Document/v2.2
+gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker --predicate-type https://spdx.dev/Document/v2.2
 ```
 
 検証が成功すれば、アーカイブがこのリポジトリのGitHub Actionsワークフローによって署名されたAttestationと一致することを確認できます。
