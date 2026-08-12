@@ -53,6 +53,16 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// </exception>
     public void LinkDotfiles(string repoRoot, string userHome, string ignoreFileName, bool overwrite, bool dryRun = false)
     {
+        if (!Path.IsPathRooted(repoRoot))
+        {
+            repoRoot = Path.GetFullPath(repoRoot);
+        }
+
+        if (!Path.IsPathRooted(userHome))
+        {
+            userHome = Path.GetFullPath(userHome);
+        }
+
         if (dryRun)
         {
             _logger.Info("DRY RUN MODE: No files will be actually linked");

@@ -39,6 +39,27 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
+    public void LinkDotfiles_ShouldResolveRelativeRootsBeforeCreatingLinks()
+    {
+        var repoRoot = Path.Combine("relative", "repo");
+        var userHome = Path.Combine("relative", "home");
+        var fullRepoRoot = Path.GetFullPath(repoRoot);
+        var fullUserHome = Path.GetFullPath(userHome);
+        var source = Path.Combine(fullRepoRoot, ".settings");
+        var target = Path.Combine(fullUserHome, ".settings");
+
+        _fileSystemMock.EnumerateFiles(fullRepoRoot, ".*", false).Returns([source]);
+
+        _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false);
+
+        _fileSystemMock.Received(1).CreateFileSymlink(target, source);
+        _fileSystemMock.Received(1).PathExists(Path.Combine(fullRepoRoot, ".dotfiles_ignore"));
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(
+            Arg.Is<string>(path => !Path.IsPathFullyQualified(path)),
+            Arg.Any<string>());
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldSkipIgnoredFiles()
     {
         // Arrange
