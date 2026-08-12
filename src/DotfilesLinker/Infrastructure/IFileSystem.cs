@@ -20,6 +20,13 @@ internal interface IFileSystem
     bool DirectoryExists(string path);
 
     /// <summary>
+    /// Determines whether a file-system entry exists without following symbolic links.
+    /// </summary>
+    /// <param name="path">The path to inspect.</param>
+    /// <returns><c>true</c> if an entry exists, including a dangling symbolic link; otherwise, <c>false</c>.</returns>
+    bool PathExists(string path);
+
+    /// <summary>
     /// Determines whether the specified path is a symbolic link or another reparse point.
     /// </summary>
     /// <param name="path">The path to inspect.</param>
@@ -38,6 +45,13 @@ internal interface IFileSystem
     /// </summary>
     /// <param name="path">The path of the file or directory to delete.</param>
     void Delete(string path);
+
+    /// <summary>
+    /// Moves a file, directory, or symbolic link without following it.
+    /// </summary>
+    /// <param name="sourcePath">The existing entry to move.</param>
+    /// <param name="destinationPath">The new path for the entry.</param>
+    void Move(string sourcePath, string destinationPath);
 
     /// <summary>
     /// Creates a symbolic link to a file at the specified path.

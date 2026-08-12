@@ -39,6 +39,21 @@ public sealed class FileSystemTests : IDisposable
     }
 
     [Fact]
+    public void PathExists_ReflectsFilesDirectoriesAndDanglingLinks()
+    {
+        var file = CreateFile("existing.txt");
+        var directory = Path.Combine(_root, "existing-directory");
+        var danglingLink = Path.Combine(_root, "dangling-link.txt");
+        Directory.CreateDirectory(directory);
+        _fileSystem.CreateFileSymlink(danglingLink, Path.Combine(_root, "missing.txt"));
+
+        Assert.True(_fileSystem.PathExists(file));
+        Assert.True(_fileSystem.PathExists(directory));
+        Assert.True(_fileSystem.PathExists(danglingLink));
+        Assert.False(_fileSystem.PathExists(Path.Combine(_root, "missing")));
+    }
+
+    [Fact]
     public void EnsureDirectory_CreatesDirectoryAndIsIdempotent()
     {
         var path = Path.Combine(_root, "parent", "child");
@@ -111,6 +126,34 @@ public sealed class FileSystemTests : IDisposable
         Assert.False(File.Exists(file));
         Assert.False(Directory.Exists(directory));
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void Move_RenamesFileDirectoryAndSymbolicLink()
+    {
+        var file = CreateFile("move-file.txt");
+        var movedFile = Path.Combine(_root, "moved-file.txt");
+        var directory = Path.Combine(_root, "move-directory");
+        var movedDirectory = Path.Combine(_root, "moved-directory");
+        var link = Path.Combine(_root, "move-link.txt");
+        var movedLink = Path.Combine(_root, "moved-link.txt");
+        var directoryLinkTarget = Path.Combine(_root, "directory-link-target");
+        var directoryLink = Path.Combine(_root, "move-directory-link");
+        var movedDirectoryLink = Path.Combine(_root, "moved-directory-link");
+        Directory.CreateDirectory(directory);
+        Directory.CreateDirectory(directoryLinkTarget);
+        _fileSystem.CreateFileSymlink(link, file);
+        _fileSystem.CreateDirectorySymlink(directoryLink, directoryLinkTarget);
+
+        _fileSystem.Move(file, movedFile);
+        _fileSystem.Move(directory, movedDirectory);
+        _fileSystem.Move(link, movedLink);
+        _fileSystem.Move(directoryLink, movedDirectoryLink);
+
+        Assert.True(File.Exists(movedFile));
+        Assert.True(Directory.Exists(movedDirectory));
+        Assert.Equal(file, _fileSystem.GetLinkTarget(movedLink));
+        Assert.Equal(directoryLinkTarget, _fileSystem.GetLinkTarget(movedDirectoryLink));
     }
 
     [Fact]

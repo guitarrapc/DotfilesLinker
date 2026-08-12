@@ -298,7 +298,8 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         string normalizedSource = PathUtilities.NormalizePath(source);
         string normalizedTarget = PathUtilities.NormalizePath(target);
 
-        bool exists = fileSystem.FileExists(target) || fileSystem.DirectoryExists(target);
+        bool exists = fileSystem.PathExists(target);
+        string? backupPath = null;
         if (exists)
         {
             var currentLinkTarget = fileSystem.GetLinkTarget(target);
@@ -326,48 +327,108 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
 
             if (dryRun)
             {
-                _logger.Verbose($"[DRY-RUN] Would delete existing target: {normalizedTarget}");
+                _logger.Verbose($"[DRY-RUN] Would replace existing target: {normalizedTarget}");
             }
             else
             {
-                _logger.Verbose($"Deleting existing target: {normalizedTarget}");
-                fileSystem.Delete(target);
+                backupPath = MoveTargetAside(target);
             }
         }
 
-        // Create the link (or just log what would happen in dry-run mode)
+        if (dryRun)
+        {
+            _logger.Success(sourceIsDirectory
+                ? $"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}"
+                : $"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
+            return;
+        }
+
         try
         {
             if (sourceIsDirectory)
             {
-                if (dryRun)
-                {
-                    _logger.Success($"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}");
-                }
-                else
-                {
-                    _logger.Success($"Creating directory symlink: {normalizedTarget} -> {normalizedSource}");
-                    fileSystem.CreateDirectorySymlink(target, source);
-                }
+                fileSystem.CreateDirectorySymlink(target, source);
             }
             else
             {
-                if (dryRun)
-                {
-                    _logger.Success($"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
-                }
-                else
-                {
-                    _logger.Success($"Creating file symlink: {normalizedTarget} -> {normalizedSource}");
-                    fileSystem.CreateFileSymlink(target, source);
-                }
+                fileSystem.CreateFileSymlink(target, source);
             }
         }
         catch (Exception ex)
         {
+            if (backupPath is not null)
+            {
+                try
+                {
+                    RestoreMovedTarget(target, backupPath);
+                }
+                catch (Exception rollbackException)
+                {
+                    var combinedException = new AggregateException(
+                        $"Failed to create symlink and restore the original target '{normalizedTarget}'. " +
+                        $"The original entry may remain at '{PathUtilities.NormalizePath(backupPath)}'.",
+                        ex,
+                        rollbackException);
+                    _logger.Error(combinedException.Message);
+                    throw combinedException;
+                }
+            }
+
             _logger.Error($"Failed to create symlink from {normalizedSource} to {normalizedTarget}: {ex.Message}");
             throw;
         }
+
+        if (backupPath is not null)
+        {
+            try
+            {
+                fileSystem.Delete(backupPath);
+            }
+            catch (Exception cleanupException)
+            {
+                try
+                {
+                    RestoreMovedTarget(target, backupPath);
+                }
+                catch (Exception rollbackException)
+                {
+                    throw new AggregateException(
+                        $"Failed to remove the backup and restore the original target '{normalizedTarget}'. " +
+                        $"The original entry may remain at '{PathUtilities.NormalizePath(backupPath)}'.",
+                        cleanupException,
+                        rollbackException);
+                }
+
+                throw new IOException(
+                    $"Failed to remove the backup after replacing '{normalizedTarget}'; the original target was restored.",
+                    cleanupException);
+            }
+        }
+
+        _logger.Success($"Created symbolic link: {normalizedTarget} -> {normalizedSource}");
+    }
+
+    private string MoveTargetAside(string target)
+    {
+        var backupPath = target + ".dotfileslinker-backup";
+        for (var suffix = 1; fileSystem.PathExists(backupPath); suffix++)
+        {
+            backupPath = $"{target}.dotfileslinker-backup.{suffix}";
+        }
+
+        _logger.Verbose($"Temporarily moving existing target: {target} -> {backupPath}");
+        fileSystem.Move(target, backupPath);
+        return backupPath;
+    }
+
+    private void RestoreMovedTarget(string target, string backupPath)
+    {
+        if (fileSystem.PathExists(target))
+        {
+            fileSystem.Delete(target);
+        }
+
+        fileSystem.Move(backupPath, target);
     }
 
     /// <summary>

@@ -97,7 +97,7 @@ public class DryRunTests
         _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(filesInRepo);
 
         // Simulate existing file
-        _fileSystemMock.FileExists(Arg.Is<string>(s => s.Contains(".file1"))).Returns(true);
+        _fileSystemMock.PathExists(Arg.Is<string>(s => s.Contains(".file1"))).Returns(true);
         _fileSystemMock.DirectoryExists(Arg.Is<string>(s => s.Contains("/repo"))).Returns(true);
 
         // GetLinkTargetのモックを設定
@@ -114,7 +114,7 @@ public class DryRunTests
         _fileSystemMock.DidNotReceive().Delete(Arg.Any<string>());
 
         // Verify that dry run logs were produced
-        _loggerMock.Received().Verbose(Arg.Is<string>(s => s.StartsWith("[DRY-RUN] Would delete")));
+        _loggerMock.Received().Verbose(Arg.Is<string>(s => s.StartsWith("[DRY-RUN] Would replace")));
     }
 
     [Fact]

@@ -7,6 +7,23 @@ internal sealed class DefaultFileSystem : IFileSystem
     /// <inheritdoc/>
     public bool DirectoryExists(string p) => Directory.Exists(p);
     /// <inheritdoc/>
+    public bool PathExists(string p)
+    {
+        try
+        {
+            _ = File.GetAttributes(p);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+    }
+    /// <inheritdoc/>
     public bool IsSymbolicLink(string p) =>
         (File.GetAttributes(p) & FileAttributes.ReparsePoint) != 0;
     /// <inheritdoc/>
@@ -16,14 +33,40 @@ internal sealed class DefaultFileSystem : IFileSystem
     /// <inheritdoc/>
     public void Delete(string p)
     {
-        if (File.Exists(p))
+        FileAttributes attributes;
+        try
         {
-            File.Delete(p);
+            attributes = File.GetAttributes(p);
         }
-        else if (Directory.Exists(p))
+        catch (FileNotFoundException)
+        {
+            return;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return;
+        }
+
+        if ((attributes & FileAttributes.Directory) != 0)
         {
             Directory.Delete(p, recursive: false);
+            return;
         }
+
+        File.Delete(p);
+    }
+
+    /// <inheritdoc/>
+    public void Move(string sourcePath, string destinationPath)
+    {
+        var attributes = File.GetAttributes(sourcePath);
+        if ((attributes & FileAttributes.Directory) != 0)
+        {
+            Directory.Move(sourcePath, destinationPath);
+            return;
+        }
+
+        File.Move(sourcePath, destinationPath);
     }
 
     /// <inheritdoc/>
