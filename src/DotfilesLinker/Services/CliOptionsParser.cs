@@ -5,7 +5,8 @@ internal readonly record struct CliOptions(
     bool ShowVersion = false,
     bool ForceOverwrite = false,
     bool Verbose = false,
-    bool DryRun = false);
+    bool DryRun = false,
+    string? RepositoryRoot = null);
 
 internal static class CliOptionsParser
 {
@@ -19,9 +20,11 @@ internal static class CliOptionsParser
         var forceOverwrite = false;
         var verbose = false;
         var dryRun = false;
+        string? repositoryRoot = null;
 
-        foreach (var argument in args)
+        for (var index = 0; index < args.Length; index++)
         {
+            var argument = args[index];
             switch (argument)
             {
                 case "--help":
@@ -46,11 +49,34 @@ internal static class CliOptionsParser
                 case "-d":
                     dryRun = true;
                     break;
+                case "--root":
+                    if (++index >= args.Length || string.IsNullOrEmpty(args[index]))
+                    {
+                        options = default;
+                        error = "option '--root' requires a non-empty path";
+                        return false;
+                    }
+
+                    repositoryRoot = args[index];
+                    break;
                 case "--":
                     options = default;
                     error = "unexpected argument '--'";
                     return false;
                 default:
+                    if (argument.StartsWith("--root=", StringComparison.Ordinal))
+                    {
+                        repositoryRoot = argument["--root=".Length..];
+                        if (repositoryRoot.Length == 0)
+                        {
+                            options = default;
+                            error = "option '--root' requires a non-empty path";
+                            return false;
+                        }
+
+                        break;
+                    }
+
                     options = default;
                     error = argument.StartsWith('-')
                         ? $"unknown option '{argument}'"
@@ -64,7 +90,8 @@ internal static class CliOptionsParser
             showVersion,
             forceOverwrite,
             verbose,
-            dryRun);
+            dryRun,
+            repositoryRoot);
         error = null;
         return true;
     }

@@ -42,6 +42,30 @@ public class CliOptionsParserTests
         Assert.Contains(expectedError, error);
     }
 
+    [Theory]
+    [InlineData("--root", "../dotfiles")]
+    [InlineData("--root=../dotfiles")]
+    public void TryParse_ParsesRepositoryRoot(params string[] args)
+    {
+        var result = CliOptionsParser.TryParse(args, out var options, out var error);
+
+        Assert.True(result);
+        Assert.Null(error);
+        Assert.Equal("../dotfiles", options.RepositoryRoot);
+    }
+
+    [Theory]
+    [InlineData("--root")]
+    [InlineData("--root=")]
+    public void TryParse_RejectsMissingRepositoryRoot(params string[] args)
+    {
+        var result = CliOptionsParser.TryParse(args, out var options, out var error);
+
+        Assert.False(result);
+        Assert.Equal(default, options);
+        Assert.Contains("requires a non-empty path", error);
+    }
+
     public static TheoryData<string[], bool, bool, bool, bool, bool> ValidOptions() => new()
     {
         { [], false, false, false, false, false },

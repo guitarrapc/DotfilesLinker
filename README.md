@@ -28,11 +28,10 @@ Fast C# Native AOT utility to create symbolic links from dotfiles to your home d
 
 ```sh
 git clone https://github.com/guitarrapc/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
 # Safe mode, do not overwrite existing files
-DotfilesLinker --dry-run
+DotfilesLinker --root ~/.dotfiles --dry-run
 # use --force to overwrite destination files
-DotfilesLinker --force
+DotfilesLinker --root ~/.dotfiles --force
 ```
 
 ## How It Works
@@ -210,6 +209,7 @@ All options are optional. The default behavior is to create symbolic links for a
 | --- | --- |
 | `--help`, `-h` | Display help information |
 | `--version` | Display version information |
+| `--root PATH` | Directory containing dotfiles; takes precedence over `DOTFILES_ROOT` |
 | `--force` | Overwrite existing files or directories |
 | `--verbose`, `-v` | Display detailed information during execution |
 | `--dry-run`, `-d` | Simulate operations without making any changes to the filesystem |
@@ -220,7 +220,7 @@ DotfilesLinker can be configured using the following environment variables:
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `DOTFILES_ROOT` | Root directory of your dotfiles repository | Current directory |
+| `DOTFILES_ROOT` | Root directory used when `--root` is omitted | Current directory |
 | `DOTFILES_HOME` | User's home directory | User profile directory (`$HOME`) |
 | `DOTFILES_IGNORE_FILE` | Name of the ignore file | `dotfiles_ignore` |
 
@@ -235,6 +235,12 @@ export DOTFILES_HOME=/custom/home/path
 
 # Run with custom settings
 DotfilesLinker --force
+```
+
+The command-line option takes precedence over the environment variable:
+
+```sh
+DotfilesLinker --root /path/to/my/dotfiles
 ```
 
 ### dotfiles_ignore File

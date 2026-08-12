@@ -29,20 +29,26 @@ var fs = new DefaultFileSystem();
 var logger = new ConsoleLogger(options.Verbose);
 var svc = new FileLinkerService(fs, logger);
 
-// Get configuration from environment variables or use defaults
-string executionRoot = Environment.GetEnvironmentVariable("DOTFILES_ROOT") ?? Environment.CurrentDirectory;
-string userHome = Environment.GetEnvironmentVariable("DOTFILES_HOME") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-string ignoreFileName = Environment.GetEnvironmentVariable("DOTFILES_IGNORE_FILE") ?? "dotfiles_ignore";
-
-logger.Info($"Execution root: {executionRoot}");
-logger.Info($"User home: {userHome}");
-logger.Info($"Ignore file: {ignoreFileName}");
-logger.Info($"Force overwrite: {options.ForceOverwrite}");
-logger.Info($"Dry run: {options.DryRun}");
-
 // execute
 try
 {
+    // Get configuration from command-line options, environment variables, or defaults
+    string executionRoot = PathOptionResolver.Resolve(
+        options.RepositoryRoot,
+        Environment.GetEnvironmentVariable("DOTFILES_ROOT"),
+        Environment.CurrentDirectory);
+    string userHome = PathOptionResolver.Resolve(
+        optionValue: null,
+        Environment.GetEnvironmentVariable("DOTFILES_HOME"),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+    string ignoreFileName = Environment.GetEnvironmentVariable("DOTFILES_IGNORE_FILE") ?? "dotfiles_ignore";
+
+    logger.Info($"Execution root: {executionRoot}");
+    logger.Info($"User home: {userHome}");
+    logger.Info($"Ignore file: {ignoreFileName}");
+    logger.Info($"Force overwrite: {options.ForceOverwrite}");
+    logger.Info($"Dry run: {options.DryRun}");
+
     svc.LinkDotfiles(executionRoot, userHome, ignoreFileName, options.ForceOverwrite, options.DryRun);
 
     if (options.DryRun)
@@ -91,13 +97,14 @@ static void DisplayHelp()
 
         Options:
           --help, -h         Display this help message
+          --root PATH        Directory containing dotfiles (default: DOTFILES_ROOT or current directory)
           --force            Overwrite existing files or directories
           --verbose, -v      Display detailed information during execution
           --version          Display version information
           --dry-run, -d      Simulate the operations without making any changes
 
         Description:
-          This utility creates symbolic links from files in the current directory
+          This utility creates symbolic links from files in the selected repository
           to the appropriate locations in your home directory.
 
         Directory Structure:
@@ -110,12 +117,13 @@ static void DisplayHelp()
           Files listed in 'dotfiles_ignore' will be excluded from linking
 
         Environment Variables:
-          DOTFILES_ROOT            Directory containing dotfiles (default: current directory)
+          DOTFILES_ROOT            Directory containing dotfiles when --root is omitted
           DOTFILES_HOME            Target home directory (default: user's home directory)
           DOTFILES_IGNORE_FILE     Name of ignore file (default: dotfiles_ignore)
 
         Examples:
           {{appName}}              # Link dotfiles using default settings
+          {{appName}} --root PATH  # Link dotfiles from another directory
           {{appName}} --force      # Overwrite any existing files
           {{appName}} --verbose    # Show detailed information
           {{appName}} --dry-run    # Simulate the operations

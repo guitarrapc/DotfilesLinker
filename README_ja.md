@@ -28,13 +28,12 @@ C# Native AOTで実装された高速な dotfiles シンボリックリンク作
 
 ```sh
 git clone https://github.com/guitarrapc/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
 
 # 安全モード、既存ファイルを上書きしません
-$ DotfilesLinker
+$ DotfilesLinker --root ~/.dotfiles --dry-run
 
 # --force オプションで既存ファイルを上書き
-$ DotfilesLinker --force
+$ DotfilesLinker --root ~/.dotfiles --force
 ```
 
 ## 動作原理
@@ -212,6 +211,7 @@ DotfilesLinker --help
 | --- | --- |
 | `--help`, `-h` | ヘルプ情報を表示 |
 | `--version` | バージョン情報を表示 |
+| `--root PATH` | dotfilesリポジトリのディレクトリ。`DOTFILES_ROOT`より優先 |
 | `--force` | 既存のファイルやディレクトリを上書き |
 | `--verbose`, `-v` | 実行中の詳細情報を表示 |
 | `--dry-run`, `-d` | ファイルシステムに変更を加えずに処理をシミュレーション |
@@ -222,7 +222,7 @@ DotfilesLinkerは以下の環境変数で設定をカスタマイズできます
 
 | 変数 | 説明 | デフォルト値 |
 | --- | --- | --- |
-| `DOTFILES_ROOT` | dotfilesリポジトリのルートディレクトリ | カレントディレクトリ |
+| `DOTFILES_ROOT` | `--root`省略時に使うdotfilesリポジトリのルートディレクトリ | カレントディレクトリ |
 | `DOTFILES_HOME` | ユーザーのホームディレクトリ | ユーザープロファイルディレクトリ（`$HOME`） |
 | `DOTFILES_IGNORE_FILE` | 除外ファイルの名前 | `dotfiles_ignore` |
 
@@ -237,6 +237,12 @@ export DOTFILES_HOME=/custom/home/path
 
 # カスタム設定で実行
 DotfilesLinker --force
+```
+
+コマンドラインオプションは環境変数より優先されます：
+
+```sh
+DotfilesLinker --root /path/to/my/dotfiles
 ```
 
 ### dotfiles_ignore ファイル
