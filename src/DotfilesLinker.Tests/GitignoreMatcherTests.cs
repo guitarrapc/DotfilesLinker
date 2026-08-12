@@ -63,6 +63,21 @@ public class GitignoreMatcherTests
         Assert.False(matcher.IsIgnored("config/app.json"));
     }
 
+    [Theory]
+    [InlineData("HOME/config/*.json", "HOME/config/app.json", true)]
+    [InlineData("HOME/config/*.json", "config/app.json", false)]
+    [InlineData("ROOT/etc/*.conf", "ROOT/etc/app.conf", true)]
+    [InlineData("ROOT/etc/*.conf", "etc/app.conf", false)]
+    public void IsIgnored_HomeAndRootShareRepositoryPatternBase(
+        string pattern,
+        string path,
+        bool expected)
+    {
+        var matcher = new Services.GitignoreMatcher([pattern]);
+
+        Assert.Equal(expected, matcher.IsIgnored(path));
+    }
+
     [Fact]
     public void IsIgnored_CommentsAndEmptyLinesAreIgnored()
     {

@@ -140,4 +140,33 @@ public class FileIgnoreEnhancedTests
         _fileSystemMock.DidNotReceive().EnumerateDirectories(cacheDir);
         _fileSystemMock.DidNotReceive().EnumerateFiles(cacheDir, Arg.Any<string>(), Arg.Any<bool>());
     }
+
+    [Fact]
+    public void LinkDotfiles_DoesNotChangePatternBaseInsideHomeDirectory()
+    {
+        var repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
+        var homeDir = Path.Combine(repoRoot, "HOME");
+        var configDir = Path.Combine(homeDir, "config");
+        var source = Path.Combine(configDir, "settings.json");
+        var ignoreFileName = ".linkignore";
+        var ignoreFilePath = Path.Combine(repoRoot, ignoreFileName);
+
+        _fileSystemMock.DirectoryExists(homeDir).Returns(true);
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns(Array.Empty<string>());
+        _fileSystemMock.EnumerateDirectories(homeDir).Returns([configDir]);
+        _fileSystemMock.EnumerateFiles(configDir, "*", false).Returns([source]);
+        _fileSystemMock.FileExists(ignoreFilePath).Returns(true);
+        _fileSystemMock.ReadAllLines(ignoreFilePath).Returns(["config/settings.json"]);
+
+        _service.LinkDotfiles(
+            repoRoot,
+            Path.Combine(Path.DirectorySeparatorChar.ToString(), "home"),
+            ignoreFileName,
+            overwrite: false,
+            dryRun: true);
+
+        // The actual ignore path is HOME/config/settings.json, so a repository-root pattern
+        // without the HOME prefix must not match it.
+        _loggerMock.Received().Success(Arg.Is<string>(message => message.Contains(source)));
+    }
 }

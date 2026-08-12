@@ -104,7 +104,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         foreach (var file in allFiles)
         {
-            var relPath = Path.GetRelativePath(repoRoot, file);
+            var relPath = GetRepositoryRelativePath(repoRoot, file);
 
             if (ShouldIgnorePath(relPath, isDirectory: false, ignoreMatcher))
             {
@@ -236,7 +236,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         {
             foreach (var directory in fileSystem.EnumerateDirectories(currentDirectory))
             {
-                var relativePath = Path.GetRelativePath(repoRoot, directory);
+                var relativePath = GetRepositoryRelativePath(repoRoot, directory);
                 if (ShouldIgnorePath(relativePath, isDirectory: true, ignoreMatcher))
                 {
                     ignoredPaths.Add(directory);
@@ -248,7 +248,7 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
             foreach (var file in fileSystem.EnumerateFiles(currentDirectory, "*", recursive: false))
             {
-                var relativePath = Path.GetRelativePath(repoRoot, file);
+                var relativePath = GetRepositoryRelativePath(repoRoot, file);
                 if (ShouldIgnorePath(relativePath, isDirectory: false, ignoreMatcher))
                 {
                     ignoredPaths.Add(file);
@@ -260,6 +260,13 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
             }
         }
     }
+
+    /// <summary>
+    /// Converts a source path to the single namespace used by all ignore rules.
+    /// HOME and ROOT remain the first path segment so pattern bases never change by source directory.
+    /// </summary>
+    private static string GetRepositoryRelativePath(string repoRoot, string path) =>
+        Path.GetRelativePath(repoRoot, path);
 
     /// <summary>
     /// Creates a symbolic link from the source to the target path.
