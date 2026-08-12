@@ -83,10 +83,13 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         _logger.Verbose($"Loaded {ignoreMatcher.Count} user-defined ignore patterns from {ignorePath}");
         _logger.Verbose($"Using {_defaultIgnorePatterns.Length} default ignore patterns");
 
-        // Process each directory
-        ProcessRepositoryRoot(repoRoot, userHome, ignoreMatcher, overwrite, dryRun);
-        ProcessHomeDirectory(repoRoot, userHome, ignoreMatcher, overwrite, dryRun);
-        ProcessRootDirectory(repoRoot, ignoreMatcher, overwrite, dryRun);
+        var operations = new List<LinkOperation>();
+        CollectRepositoryRootOperations(repoRoot, userHome, ignoreMatcher, operations);
+        CollectHomeOperations(repoRoot, userHome, ignoreMatcher, operations);
+        CollectRootOperations(repoRoot, ignoreMatcher, operations);
+
+        var validatedOperations = ValidateLinkPlan(repoRoot, operations, overwrite);
+        ApplyLinkPlan(validatedOperations, dryRun);
 
         if (dryRun)
         {
@@ -107,9 +110,11 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
     /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
-    /// <param name="overwrite">Whether to overwrite existing files.</param>
-    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessRepositoryRoot(string repoRoot, string userHome, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
+    private void CollectRepositoryRootOperations(
+        string repoRoot,
+        string userHome,
+        GitignoreMatcher ignoreMatcher,
+        List<LinkOperation> operations)
     {
         var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
         _logger.Verbose($"Total files in repository root: {allFiles.Count}");
@@ -147,9 +152,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         foreach (var src in files)
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
-            ValidateLinkPaths(repoRoot, src, dst);
-            _logger.Verbose($"Linking {src} to {dst}");
-            LinkFile(src, dst, sourceIsDirectory: false, overwrite, dryRun);
+            operations.Add(new(src, dst, SourceIsDirectory: false));
         }
     }
 
@@ -159,11 +162,13 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
     /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
-    /// <param name="overwrite">Whether to overwrite existing files.</param>
-    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessHomeDirectory(string repoRoot, string userHome, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
+    private void CollectHomeOperations(
+        string repoRoot,
+        string userHome,
+        GitignoreMatcher ignoreMatcher,
+        List<LinkOperation> operations)
     {
-        ProcessDirectory(repoRoot, "HOME", userHome, ignoreMatcher, overwrite, dryRun);
+        CollectDirectoryOperations(repoRoot, "HOME", userHome, ignoreMatcher, operations);
     }
 
     /// <summary>
@@ -171,16 +176,17 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
-    /// <param name="overwrite">Whether to overwrite existing files.</param>
-    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessRootDirectory(string repoRoot, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
+    private void CollectRootOperations(
+        string repoRoot,
+        GitignoreMatcher ignoreMatcher,
+        List<LinkOperation> operations)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
             _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
             return;
         }
-        ProcessDirectory(repoRoot, "ROOT", "/", ignoreMatcher, overwrite, dryRun);
+        CollectDirectoryOperations(repoRoot, "ROOT", "/", ignoreMatcher, operations);
     }
 
     /// <summary>
@@ -190,9 +196,12 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// <param name="srcDir">The source directory path.</param>
     /// <param name="destDir">The destination directory path.</param>
     /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
-    /// <param name="overwrite">Whether to overwrite existing files.</param>
-    /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
+    private void CollectDirectoryOperations(
+        string repoRoot,
+        string srcDir,
+        string destDir,
+        GitignoreMatcher ignoreMatcher,
+        List<LinkOperation> operations)
     {
         var srcPath = Path.Combine(repoRoot, srcDir);
         if (!fileSystem.DirectoryExists(srcPath))
@@ -226,19 +235,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             var rel = Path.GetRelativePath(srcPath, entry.Path);
             var dst = Path.Combine(destDir, rel);
-            ValidateLinkPaths(repoRoot, entry.Path, dst);
-
-            var dstDir = Path.GetDirectoryName(dst)!;
-            _logger.Verbose($"Ensuring directory exists: {dstDir}");
-
-            // Only actually create the directory if not in dry-run mode
-            if (!dryRun)
-            {
-                fileSystem.EnsureDirectory(dstDir);
-            }
-
-            _logger.Verbose($"Linking {entry.Path} to {dst}");
-            LinkFile(entry.Path, dst, entry.IsDirectory, overwrite, dryRun);
+            operations.Add(new(entry.Path, dst, entry.IsDirectory));
         }
     }
 
@@ -314,67 +311,188 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         }
     }
 
+    private List<ValidatedLinkOperation> ValidateLinkPlan(
+        string repoRoot,
+        IReadOnlyList<LinkOperation> operations,
+        bool overwrite)
+    {
+        for (var index = 0; index < operations.Count; index++)
+        {
+            var operation = operations[index];
+            ValidateLinkPaths(repoRoot, operation.Source, operation.Target);
+
+            for (var previousIndex = 0; previousIndex < index; previousIndex++)
+            {
+                var previous = operations[previousIndex];
+                if (PathUtilities.PathsOverlap(previous.Target, operation.Target))
+                {
+                    throw new InvalidOperationException(
+                        $"Destinations '{previous.Target}' and '{operation.Target}' overlap.");
+                }
+            }
+        }
+
+        var validatedOperations = new List<ValidatedLinkOperation>(operations.Count);
+        foreach (var operation in operations)
+        {
+            var disposition = LinkDisposition.Create;
+            if (fileSystem.PathExists(operation.Target))
+            {
+                var currentLinkTarget = fileSystem.GetLinkTarget(operation.Target);
+                if (currentLinkTarget is not null &&
+                    PathUtilities.LinkTargetEquals(operation.Target, currentLinkTarget, operation.Source))
+                {
+                    disposition = LinkDisposition.Skip;
+                }
+                else if (overwrite)
+                {
+                    disposition = LinkDisposition.Replace;
+                }
+                else
+                {
+                    throw new InvalidOperationException(
+                        $"'{PathUtilities.NormalizePath(operation.Target)}' already exists; use --force to overwrite.");
+                }
+            }
+
+            validatedOperations.Add(new(operation, disposition));
+        }
+
+        return validatedOperations;
+    }
+
+    private void ApplyLinkPlan(IReadOnlyList<ValidatedLinkOperation> operations, bool dryRun)
+    {
+        if (dryRun)
+        {
+            foreach (var operation in operations)
+            {
+                LogLinkOperation(operation);
+                _ = LinkFile(operation, dryRun: true);
+            }
+
+            return;
+        }
+
+        foreach (var operation in operations)
+        {
+            if (operation.Disposition != LinkDisposition.Skip)
+            {
+                var targetDirectory = Path.GetDirectoryName(operation.Operation.Target)!;
+                _logger.Verbose($"Ensuring directory exists: {targetDirectory}");
+                fileSystem.EnsureDirectory(targetDirectory);
+            }
+        }
+
+        var appliedOperations = new List<AppliedLinkOperation>(operations.Count);
+        try
+        {
+            foreach (var operation in operations)
+            {
+                LogLinkOperation(operation);
+                var appliedOperation = LinkFile(operation, dryRun: false);
+                if (appliedOperation is not null)
+                {
+                    appliedOperations.Add(appliedOperation.Value);
+                }
+            }
+        }
+        catch (Exception applyException)
+        {
+            try
+            {
+                RollbackAppliedOperations(appliedOperations);
+            }
+            catch (Exception rollbackException)
+            {
+                throw new AggregateException(
+                    "Failed to apply the link plan and roll back earlier operations.",
+                    applyException,
+                    rollbackException);
+            }
+
+            throw;
+        }
+
+        try
+        {
+            foreach (var appliedOperation in appliedOperations)
+            {
+                if (appliedOperation.BackupPath is not null)
+                {
+                    fileSystem.Delete(appliedOperation.BackupPath);
+                }
+            }
+        }
+        catch (Exception cleanupException)
+        {
+            try
+            {
+                RollbackAppliedOperations(appliedOperations);
+            }
+            catch (Exception rollbackException)
+            {
+                throw new AggregateException(
+                    "Failed to remove replacement backups and roll back the link plan.",
+                    cleanupException,
+                    rollbackException);
+            }
+
+            throw new IOException(
+                "Failed to remove a replacement backup; the link plan was rolled back.",
+                cleanupException);
+        }
+
+        foreach (var appliedOperation in appliedOperations)
+        {
+            var operation = appliedOperation.Operation;
+            _logger.Success(
+                $"Created symbolic link: {PathUtilities.NormalizePath(operation.Target)} -> " +
+                PathUtilities.NormalizePath(operation.Source));
+        }
+    }
+
+    private void LogLinkOperation(ValidatedLinkOperation operation) =>
+        _logger.Verbose($"Linking {operation.Operation.Source} to {operation.Operation.Target}");
+
     /// <summary>
     /// Creates a symbolic link from the source to the target path.
     /// </summary>
-    /// <param name="source">The source file or directory path.</param>
-    /// <param name="target">The target file or directory path.</param>
-    /// <param name="sourceIsDirectory">Whether the source is a directory or directory link.</param>
-    /// <param name="overwrite">Whether to overwrite the target if it already exists.</param>
+    /// <param name="validatedOperation">The validated operation to apply.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown if the target exists and <paramref name="overwrite"/> is <c>false</c>.
-    /// </exception>
-    private void LinkFile(string source, string target, bool sourceIsDirectory, bool overwrite, bool dryRun)
+    private AppliedLinkOperation? LinkFile(ValidatedLinkOperation validatedOperation, bool dryRun)
     {
+        var (operation, disposition) = validatedOperation;
+        var (source, target, sourceIsDirectory) = operation;
+
         // Normalize paths for cross-platform consistency in logs
         string normalizedSource = PathUtilities.NormalizePath(source);
         string normalizedTarget = PathUtilities.NormalizePath(target);
 
-        bool exists = fileSystem.PathExists(target);
-        string? backupPath = null;
-        if (exists)
+        if (disposition == LinkDisposition.Skip)
         {
-            var currentLinkTarget = fileSystem.GetLinkTarget(target);
-
-            // If the target is a symlink and points to the same file, do nothing
-            if (currentLinkTarget is not null &&
-                PathUtilities.LinkTargetEquals(target, currentLinkTarget, source))
-            {
-                if (dryRun)
-                {
-                    _logger.Success($"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}");
-                }
-                else
-                {
-                    _logger.Success($"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
-                }
-                return;
-            }
-
-            if (!overwrite)
-            {
-                _logger.Verbose($"Target {normalizedTarget} exists and overwrite=false, aborting");
-                throw new InvalidOperationException($"'{normalizedTarget}' already exists; use --force to overwrite.");
-            }
-
-            if (dryRun)
-            {
-                _logger.Verbose($"[DRY-RUN] Would replace existing target: {normalizedTarget}");
-            }
-            else
-            {
-                backupPath = MoveTargetAside(target);
-            }
+            _logger.Success(dryRun
+                ? $"[DRY-RUN] Would skip already linked: {normalizedTarget} -> {normalizedSource}"
+                : $"Skipping already linked: {normalizedTarget} -> {normalizedSource}");
+            return null;
         }
 
         if (dryRun)
         {
+            if (disposition == LinkDisposition.Replace)
+            {
+                _logger.Verbose($"[DRY-RUN] Would replace existing target: {normalizedTarget}");
+            }
+
             _logger.Success(sourceIsDirectory
                 ? $"[DRY-RUN] Would create directory symlink: {normalizedTarget} -> {normalizedSource}"
                 : $"[DRY-RUN] Would create file symlink: {normalizedTarget} -> {normalizedSource}");
-            return;
+            return null;
         }
+
+        var backupPath = disposition == LinkDisposition.Replace
+            ? MoveTargetAside(target)
+            : null;
 
         try
         {
@@ -411,34 +529,40 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             throw;
         }
 
-        if (backupPath is not null)
+        return new(operation, backupPath);
+    }
+
+    private void RollbackAppliedOperations(IReadOnlyList<AppliedLinkOperation> operations)
+    {
+        List<Exception>? rollbackExceptions = null;
+        for (var index = operations.Count - 1; index >= 0; index--)
         {
+            var operation = operations[index];
             try
             {
-                fileSystem.Delete(backupPath);
-            }
-            catch (Exception cleanupException)
-            {
-                try
+                if (fileSystem.PathExists(operation.Operation.Target))
                 {
-                    RestoreMovedTarget(target, backupPath);
-                }
-                catch (Exception rollbackException)
-                {
-                    throw new AggregateException(
-                        $"Failed to remove the backup and restore the original target '{normalizedTarget}'. " +
-                        $"The original entry may remain at '{PathUtilities.NormalizePath(backupPath)}'.",
-                        cleanupException,
-                        rollbackException);
+                    fileSystem.Delete(operation.Operation.Target);
                 }
 
-                throw new IOException(
-                    $"Failed to remove the backup after replacing '{normalizedTarget}'; the original target was restored.",
-                    cleanupException);
+                if (operation.BackupPath is not null)
+                {
+                    fileSystem.Move(operation.BackupPath, operation.Operation.Target);
+                }
+            }
+            catch (Exception ex)
+            {
+                rollbackExceptions ??= [];
+                rollbackExceptions.Add(new IOException(
+                    $"Failed to roll back destination '{operation.Operation.Target}'.",
+                    ex));
             }
         }
 
-        _logger.Success($"Created symbolic link: {normalizedTarget} -> {normalizedSource}");
+        if (rollbackExceptions is not null)
+        {
+            throw new AggregateException(rollbackExceptions);
+        }
     }
 
     private string MoveTargetAside(string target)
@@ -510,4 +634,21 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     }
 
     private readonly record struct SourceEntry(string Path, bool IsDirectory);
+
+    private readonly record struct LinkOperation(string Source, string Target, bool SourceIsDirectory);
+
+    private readonly record struct ValidatedLinkOperation(
+        LinkOperation Operation,
+        LinkDisposition Disposition);
+
+    private readonly record struct AppliedLinkOperation(
+        LinkOperation Operation,
+        string? BackupPath);
+
+    private enum LinkDisposition
+    {
+        Create,
+        Replace,
+        Skip
+    }
 }

@@ -113,6 +113,88 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
+    public void LinkDotfiles_ShouldValidateAllExistingTargetsBeforeApplyingPlan()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "preflight-conflict");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var firstSource = Path.Combine(repoRoot, ".first");
+        var secondSource = Path.Combine(repoRoot, ".second");
+        var secondTarget = Path.Combine(userHome, ".second");
+
+        _fileSystemMock
+            .EnumerateFiles(repoRoot, ".*", false)
+            .Returns([firstSource, secondSource]);
+        _fileSystemMock.PathExists(secondTarget).Returns(true);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
+
+        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().Move(Arg.Any<string>(), Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().Delete(Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRejectOverlappingDestinationsBeforeApplyingPlan()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "duplicate-target");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var homeRoot = Path.Combine(repoRoot, "HOME");
+        var rootSource = Path.Combine(repoRoot, ".settings");
+        var homeSource = Path.Combine(homeRoot, ".settings");
+        var target = Path.Combine(userHome, ".settings");
+
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([rootSource]);
+        _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
+        _fileSystemMock.EnumerateFiles(homeRoot, "*", false).Returns([homeSource]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+
+        Assert.Contains("Destinations", exception.Message);
+        _fileSystemMock.DidNotReceive().PathExists(target);
+        _fileSystemMock.DidNotReceive().EnsureDirectory(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRollbackEarlierLinksWhenLaterCreationFails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "apply-rollback");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var firstSource = Path.Combine(repoRoot, ".first");
+        var secondSource = Path.Combine(repoRoot, ".second");
+        var firstTarget = Path.Combine(userHome, ".first");
+        var secondTarget = Path.Combine(userHome, ".second");
+        var firstTargetInspectionCount = 0;
+
+        _fileSystemMock
+            .EnumerateFiles(repoRoot, ".*", false)
+            .Returns([firstSource, secondSource]);
+        _fileSystemMock
+            .PathExists(firstTarget)
+            .Returns(_ => firstTargetInspectionCount++ > 0);
+        _fileSystemMock.PathExists(secondTarget).Returns(false);
+        _fileSystemMock
+            .When(fs => fs.CreateFileSymlink(secondTarget, secondSource))
+            .Do(_ => throw new IOException("creation failed"));
+
+        Assert.Throws<IOException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: false));
+
+        Received.InOrder(() =>
+        {
+            _fileSystemMock.CreateFileSymlink(firstTarget, firstSource);
+            _fileSystemMock.CreateFileSymlink(secondTarget, secondSource);
+            _fileSystemMock.Delete(firstTarget);
+        });
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldSkipIgnoredFiles()
     {
         // Arrange
@@ -546,7 +628,7 @@ public class FileLinkerServiceTests
         var exception = Assert.Throws<IOException>(() =>
             _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
 
-        Assert.Contains("original target was restored", exception.Message);
+        Assert.Contains("link plan was rolled back", exception.Message);
         Received.InOrder(() =>
         {
             _fileSystemMock.Move(target, backup);
