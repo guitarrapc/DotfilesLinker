@@ -197,4 +197,19 @@ public class WildcardMatcherTests
         // Assert
         Assert.False(result);
     }
+
+    [Theory]
+    [InlineData("file[0-9].txt", "file7.txt", true)]
+    [InlineData("file[0-9].txt", "filex.txt", false)]
+    [InlineData("file[!0-9].txt", "filex.txt", true)]
+    [InlineData("file[!0-9].txt", "file7.txt", false)]
+    [InlineData(@"file\?.txt", "file?.txt", true)]
+    [InlineData(@"file\*.txt", "file*.txt", true)]
+    public void IsMatch_GitignoreCharacterClassesAndEscapes(
+        string pattern,
+        string text,
+        bool expected)
+    {
+        Assert.Equal(expected, Services.WildcardMatcher.IsMatch(text, pattern));
+    }
 }

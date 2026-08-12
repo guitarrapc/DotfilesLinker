@@ -1,201 +1,247 @@
-﻿using DotfilesLinker.Utilities;
+using DotfilesLinker.Utilities;
 
 namespace DotfilesLinker.Services;
 
 /// <summary>
-/// Provides functionality to match paths using gitignore-style patterns.
+/// Evaluates an ordered set of gitignore-style rules against repository-relative paths.
 /// </summary>
-public static class GitignoreMatcher
+public sealed class GitignoreMatcher
 {
+    private readonly Rule[] _rules;
+
     /// <summary>
-    /// Represents a parsed .gitignore pattern
+    /// Creates a matcher from ignore-file lines. Empty lines and comments are discarded.
     /// </summary>
-    private readonly struct GitIgnorePattern
+    public GitignoreMatcher(IEnumerable<string> patterns)
     {
-        /// <summary>
-        /// Whether the pattern is a negation pattern (starts with !).
-        /// </summary>
-        public readonly bool Negation;
+        ArgumentNullException.ThrowIfNull(patterns);
 
-        /// <summary>
-        /// Whether the pattern is directory-only (ends with /).
-        /// </summary>
-        public readonly bool DirOnly;
-
-        /// <summary>
-        /// Path segments split by '/' (may include "**").
-        /// </summary>
-        public readonly string[] Segments;
-
-        public GitIgnorePattern(string pattern)
-        {
-            // Check for negation
-            if (pattern.StartsWith("!"))
-            {
-                Negation = true;
-                pattern = pattern.Substring(1).Trim();
-            }
-            else
-            {
-                Negation = false;
-            }
-
-            // Check for directory-only pattern
-            if (pattern.EndsWith("/"))
-            {
-                DirOnly = true;
-                pattern = pattern.Substring(0, pattern.Length - 1);
-            }
-            else
-            {
-                DirOnly = false;
-            }
-
-            // Trim leading slash if present
-            if (pattern.StartsWith("/"))
-            {
-                pattern = pattern.Substring(1);
-            }
-
-            Segments = pattern.Split('/');
-        }
+        _rules = patterns
+            .Select(Rule.TryParse)
+            .Where(static rule => rule is not null)
+            .Cast<Rule>()
+            .ToArray();
     }
 
     /// <summary>
-    /// Checks if a path matches a .gitignore style pattern.
+    /// Gets the number of active rules.
     /// </summary>
-    /// <param name="path">The path to check (using forward slashes).</param>
-    /// <param name="pattern">The .gitignore style pattern.</param>
-    /// <param name="isDir">Whether the path represents a directory.</param>
-    /// <returns>True if the path matches the pattern; otherwise, false.</returns>
-    public static bool IsMatch(string path, string pattern, bool isDir)
-    {
-        // Parse the pattern
-        var pat = new GitIgnorePattern(pattern);
-
-        // Skip directory-only patterns if the path is not a directory
-        if (pat.DirOnly && !isDir)
-        {
-            return false;
-        }
-
-        // Ensure path uses forward slashes
-        path = PathUtilities.NormalizePathForPatternMatching(path);
-
-        // Remove any leading / for consistency
-        if (path.StartsWith("/"))
-        {
-            path = path.Substring(1);
-        }
-
-        // Split path into segments
-        var pathSegs = path.Split('/');
-
-        // Match the segments
-        return MatchSegments(pat.Segments, pathSegs);
-    }
+    public int Count => _rules.Length;
 
     /// <summary>
-    /// Checks if path segments match pattern segments.
+    /// Determines whether a repository-relative path is ignored. When several rules match,
+    /// the last matching rule wins, as it does in a .gitignore file.
     /// </summary>
-    /// <param name="segments">The pattern segments.</param>
-    /// <param name="pathSegs">The path segments.</param>
-    /// <returns>True if the path segments match the pattern segments; otherwise, false.</returns>
-    private static bool MatchSegments(string[] segments, string[] pathSegs)
+    public bool IsIgnored(string path, bool isDirectory = false)
     {
-        return MatchHelper(segments, pathSegs, 0, 0);
-    }
+        ArgumentNullException.ThrowIfNull(path);
 
-    /// <summary>
-    /// Recursive helper for matchSegments.
-    /// </summary>
-    /// <param name="segments">The pattern segments.</param>
-    /// <param name="pathSegs">The path segments.</param>
-    /// <param name="i">Current index in segments.</param>
-    /// <param name="j">Current index in pathSegs.</param>
-    /// <returns>True if remaining segments match remaining path segments; otherwise, false.</returns>
-    private static bool MatchHelper(string[] segments, string[] pathSegs, int i, int j)
-    {
-        int nSeg = segments.Length;
-        int nPath = pathSegs.Length;
-
-        while (i < nSeg && j < nPath)
+        var normalizedPath = NormalizePath(path);
+        var pathSegments = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
         {
-            string seg = segments[i];
+            var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
+            var ignored = false;
 
-            if (seg == "**")
+            foreach (var rule in _rules)
             {
-                // "**" can match zero or more segments
-                // If "**" is the last segment, match everything
-                if (i + 1 == nSeg)
+                if (rule.IsMatch(pathSegments, pathLength, candidateIsDirectory))
                 {
-                    return true;
-                }
-
-                // Try to match the rest of the pattern at different positions
-                for (int k = j; k <= nPath; k++)
-                {
-                    if (MatchHelper(segments, pathSegs, i + 1, k))
-                    {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
-            // For non-"**" segments, match just one segment
-            if (!MatchSingleSegment(seg, pathSegs[j]))
-            {
-                return false;
-            }
-
-            i++;
-            j++;
-        }
-
-        // After the loop: check if we've used all segments
-        if (i == nSeg && j == nPath)
-        {
-            return true;
-        }
-
-        // If we've consumed all path segments but still have pattern segments,
-        // those remaining segments must all be "**"
-        if (i < nSeg && j == nPath)
-        {
-            for (int k = i; k < nSeg; k++)
-            {
-                if (segments[k] != "**")
-                {
-                    return false;
+                    ignored = !rule.Negated;
                 }
             }
-            return true;
+
+            // Git cannot re-include a file while one of its parent directories remains excluded.
+            if (ignored)
+            {
+                return true;
+            }
         }
 
         return false;
     }
 
     /// <summary>
-    /// Checks if a single path segment matches a pattern segment.
+    /// Checks a path against one gitignore-style pattern.
     /// </summary>
-    /// <param name="segment">The pattern segment.</param>
-    /// <param name="name">The path segment.</param>
-    /// <returns>True if the path segment matches the pattern segment; otherwise, false.</returns>
-    private static bool MatchSingleSegment(string segment, string name)
+    public static bool IsMatch(string path, string pattern, bool isDirectory)
     {
-        // Edge cases
-        if (string.IsNullOrEmpty(segment))
+        ArgumentNullException.ThrowIfNull(path);
+        ArgumentNullException.ThrowIfNull(pattern);
+
+        var rule = Rule.TryParse(pattern);
+        if (rule is null)
         {
-            return string.IsNullOrEmpty(name);
+            return false;
         }
 
-        if (segment == "*")
+        var pathSegments = NormalizePath(path).Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (var pathLength = 1; pathLength <= pathSegments.Length; pathLength++)
         {
-            return true;
+            var candidateIsDirectory = pathLength < pathSegments.Length || isDirectory;
+            if (rule.IsMatch(pathSegments, pathLength, candidateIsDirectory))
+            {
+                return true;
+            }
         }
 
-        // For more complex patterns with * and ? wildcards
-        return WildcardMatcher.IsMatch(name, segment);
+        return false;
+    }
+
+    private static string NormalizePath(string path) =>
+        PathUtilities.NormalizePathForPatternMatching(path).TrimStart('/');
+
+    private sealed class Rule
+    {
+        private readonly bool _anchored;
+        private readonly bool _directoryOnly;
+        private readonly bool _hasSlash;
+        private readonly bool _descendantsOnly;
+        private readonly string[] _segments;
+
+        private Rule(string pattern, bool negated, bool anchored, bool directoryOnly)
+        {
+            Negated = negated;
+            _anchored = anchored;
+            _directoryOnly = directoryOnly;
+            _hasSlash = pattern.Contains('/');
+            _descendantsOnly = pattern.EndsWith("/**", StringComparison.Ordinal);
+            _segments = pattern.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        public bool Negated { get; }
+
+        public static Rule? TryParse(string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return null;
+            }
+
+            var pattern = TrimUnescapedTrailingSpaces(line);
+            if (pattern.Length == 0 || pattern[0] == '#')
+            {
+                return null;
+            }
+
+            var escapedPrefix = pattern.StartsWith("\\#", StringComparison.Ordinal) ||
+                pattern.StartsWith("\\!", StringComparison.Ordinal);
+            var negated = !escapedPrefix && pattern[0] == '!';
+            if (negated)
+            {
+                pattern = pattern[1..];
+            }
+            else if (escapedPrefix)
+            {
+                pattern = pattern[1..];
+            }
+
+            if (pattern.Length == 0)
+            {
+                return null;
+            }
+
+            var anchored = pattern.StartsWith('/');
+            var directoryOnly = pattern.EndsWith('/');
+            pattern = pattern.Trim('/');
+
+            return pattern.Length == 0
+                ? null
+                : new Rule(pattern, negated, anchored, directoryOnly);
+        }
+
+        public bool IsMatch(string[] pathSegments, int pathLength, bool isDirectory)
+        {
+            if (pathLength == 0)
+            {
+                return false;
+            }
+
+            if (_descendantsOnly && pathLength < _segments.Length)
+            {
+                return false;
+            }
+
+            if (!_hasSlash && !_anchored)
+            {
+                return (!_directoryOnly || isDirectory) &&
+                    WildcardMatcher.IsMatch(pathSegments[pathLength - 1], _segments[0]);
+            }
+
+            return (!_directoryOnly || isDirectory) &&
+                MatchSegments(_segments, pathSegments, 0, 0, pathLength);
+        }
+
+        private static bool MatchSegments(
+            string[] patternSegments,
+            string[] pathSegments,
+            int patternIndex,
+            int pathIndex,
+            int pathLength)
+        {
+            while (patternIndex < patternSegments.Length && pathIndex < pathLength)
+            {
+                var segment = patternSegments[patternIndex];
+                if (segment == "**")
+                {
+                    if (patternIndex + 1 == patternSegments.Length)
+                    {
+                        return true;
+                    }
+
+                    for (var nextPathIndex = pathIndex; nextPathIndex <= pathLength; nextPathIndex++)
+                    {
+                        if (MatchSegments(
+                            patternSegments,
+                            pathSegments,
+                            patternIndex + 1,
+                            nextPathIndex,
+                            pathLength))
+                        {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+
+                if (!WildcardMatcher.IsMatch(pathSegments[pathIndex], segment))
+                {
+                    return false;
+                }
+
+                patternIndex++;
+                pathIndex++;
+            }
+
+            while (patternIndex < patternSegments.Length && patternSegments[patternIndex] == "**")
+            {
+                patternIndex++;
+            }
+
+            return patternIndex == patternSegments.Length && pathIndex == pathLength;
+        }
+
+        private static string TrimUnescapedTrailingSpaces(string pattern)
+        {
+            var end = pattern.Length;
+            while (end > 0 && pattern[end - 1] == ' ')
+            {
+                var slashCount = 0;
+                for (var i = end - 2; i >= 0 && pattern[i] == '\\'; i--)
+                {
+                    slashCount++;
+                }
+
+                if ((slashCount & 1) != 0)
+                {
+                    return pattern.Remove(end - 2, 1);
+                }
+
+                end--;
+            }
+
+            return end == pattern.Length ? pattern : pattern[..end];
+        }
     }
 }

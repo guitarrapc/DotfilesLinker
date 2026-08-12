@@ -238,7 +238,7 @@ DotfilesLinker --force
 
 ### dotfiles_ignore File
 
-You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file. DotfilesLinker supports several pattern types for flexible file exclusion:
+You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file. Rules use gitignore-style syntax and paths are relative to the dotfiles repository root.
 
 ```
 # Example dotfiles_ignore
@@ -248,46 +248,51 @@ README.md
 LICENSE
 ```
 
-#### Supported Pattern Types
+#### Gitignore-style Rules
 
-DotfilesLinker supports the following pattern types in the `dotfiles_ignore` file:
+Rules are evaluated from top to bottom. If multiple rules match, the last matching rule wins. Empty lines and lines beginning with `#` are ignored.
 
 ```
-# Simple filenames or paths that match exactly
+# A name without `/` matches at any depth
 .github
 README.md
 LICENSE
 
-# Wildcard patterns
+# Wildcards
 # `*` matches any string (excluding path separators)
 # `?` matches any single character
+# `[a-z]` matches one character in a range
 *.log
 temp*
 backup.???
+file[0-9].txt
 
-# Gitignore-style patterns
-# A pattern containing `/` matches a specific path from the repository root
+# A pattern containing `/` is relative to the repository root
+# A leading `/` explicitly anchors a pattern to the repository root
 # `**` matches any number of directories (including zero)
 # A pattern ending with `/` matches directories only
 docs/build/
-config/local_*.json
-HOME/**.log
+/config/local_*.json
+HOME/**/*.log
 **/temp/
 
 # Negation patterns
 # A pattern starting with `!` explicitly includes files that would otherwise be ignored
-# Processed after non-negated patterns
-# --------------------------
-# Patterns are processed in two stages:
-# 1. First, all non-negation patterns are evaluated
-# 2. Then, negation patterns (`!`) are applied and can override previous exclusions
 ## Exclude all .log files except important.log
 *.log
 !important.log
 ## Exclude everything in docs except README.md
 docs/
+!docs/
+docs/*
 !docs/README.md
+
+# Escape a leading `#` or `!` to match it literally
+\#notes
+\!important
 ```
+
+As with Git, a file cannot be re-included while one of its parent directories remains excluded. Re-include the parent directory first, as shown in the `docs/README.md` example. Built-in automatic exclusions cannot be overridden by negation rules.
 
 
 ### Automatic Exclusions

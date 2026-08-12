@@ -1,83 +1,145 @@
-﻿namespace DotfilesLinker.Services;
+namespace DotfilesLinker.Services;
 
 /// <summary>
-/// Provides advanced wildcard pattern matching functionality.
+/// Matches a single path segment using gitignore-style wildcards.
 /// </summary>
 public static class WildcardMatcher
 {
     /// <summary>
-    /// Performs wildcard matching for file patterns supporting multiple asterisks (*) and question marks (?) in patterns.
+    /// Matches <paramref name="text"/> against a pattern containing <c>*</c>, <c>?</c>,
+    /// character ranges such as <c>[a-z]</c>, and backslash escapes.
     /// </summary>
-    /// <param name="text">The text to match against the pattern.</param>
-    /// <param name="pattern">The pattern to match.</param>
-    /// <returns>True if the text matches the pattern; otherwise, false.</returns>
     public static bool IsMatch(string text, string pattern)
     {
-        // Edge cases
-        if (string.IsNullOrEmpty(pattern))
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(pattern);
+
+        var textIndex = 0;
+        var patternIndex = 0;
+        var starPatternIndex = -1;
+        var starTextIndex = -1;
+
+        while (textIndex < text.Length)
         {
-            return string.IsNullOrEmpty(text);
+            if (patternIndex < pattern.Length && pattern[patternIndex] == '*')
+            {
+                do
+                {
+                    patternIndex++;
+                }
+                while (patternIndex < pattern.Length && pattern[patternIndex] == '*');
+
+                starPatternIndex = patternIndex;
+                starTextIndex = textIndex;
+                continue;
+            }
+
+            if (patternIndex < pattern.Length &&
+                TryMatchToken(pattern, patternIndex, text[textIndex], out var nextPatternIndex))
+            {
+                patternIndex = nextPatternIndex;
+                textIndex++;
+                continue;
+            }
+
+            if (starPatternIndex < 0 || ++starTextIndex > text.Length)
+            {
+                return false;
+            }
+
+            textIndex = starTextIndex;
+            patternIndex = starPatternIndex;
         }
 
-        if (pattern == "*")
+        while (patternIndex < pattern.Length && pattern[patternIndex] == '*')
         {
+            patternIndex++;
+        }
+
+        return patternIndex == pattern.Length;
+    }
+
+    private static bool TryMatchToken(string pattern, int index, char value, out int nextIndex)
+    {
+        var token = pattern[index];
+        if (token == '?')
+        {
+            nextIndex = index + 1;
             return true;
         }
 
-        // Case insensitive comparison
-        return MatchPattern(text.ToLowerInvariant(), pattern.ToLowerInvariant(), 0, 0);
+        if (token == '\\' && index + 1 < pattern.Length)
+        {
+            nextIndex = index + 2;
+            return CharsEqual(pattern[index + 1], value);
+        }
+
+        if (token == '[' && TryMatchCharacterClass(pattern, index, value, out nextIndex, out var matches))
+        {
+            return matches;
+        }
+
+        nextIndex = index + 1;
+        return CharsEqual(token, value);
     }
 
-    /// <summary>
-    /// Dynamic programming based pattern matching that handles wildcards.
-    /// </summary>
-    /// <param name="text">The text to match.</param>
-    /// <param name="pattern">The pattern to match against.</param>
-    /// <param name="textIndex">Current position in the text.</param>
-    /// <param name="patternIndex">Current position in the pattern.</param>
-    /// <returns>True if the remaining text matches the remaining pattern; otherwise, false.</returns>
-    private static bool MatchPattern(string text, string pattern, int textIndex, int patternIndex)
+    private static bool TryMatchCharacterClass(
+        string pattern,
+        int startIndex,
+        char value,
+        out int nextIndex,
+        out bool matches)
     {
-        // For '*': since '*' can match zero or more characters, `dp[i][j] = dp[i-1][j] || dp[i][j-1]`
-        // For '?': since '?' matches any single character, `dp[i][j] = dp[i-1][j-1]`
-        // For a regular character: the characters must match and the preceding pattern must also match, so `dp[i][j] = dp[i-1][j-1] && text[i-1] == pattern[j-1]`
-
-        int textLength = text.Length;
-        int patternLength = pattern.Length;
-
-        // Create a DP table
-        bool[,] dp = new bool[textLength + 1, patternLength + 1];
-        dp[0, 0] = true; // Empty text matches empty pattern
-
-        // Handle patterns with leading '*'
-        for (int j = 1; j <= patternLength; j++)
+        var index = startIndex + 1;
+        var negated = index < pattern.Length && (pattern[index] == '!' || pattern[index] == '^');
+        if (negated)
         {
-            if (pattern[j - 1] == '*')
+            index++;
+        }
+
+        var classStart = index;
+        var found = false;
+        while (index < pattern.Length && pattern[index] != ']')
+        {
+            var lower = pattern[index];
+            if (lower == '\\' && index + 1 < pattern.Length)
             {
-                dp[0, j] = dp[0, j - 1];
+                lower = pattern[++index];
+            }
+
+            if (index + 2 < pattern.Length && pattern[index + 1] == '-' && pattern[index + 2] != ']')
+            {
+                var upper = pattern[index + 2];
+                found |= IsInRange(value, lower, upper);
+                index += 3;
+            }
+            else
+            {
+                found |= CharsEqual(lower, value);
+                index++;
             }
         }
 
-        // Fill the DP table
-        for (int i = 1; i <= textLength; i++)
+        if (index >= pattern.Length || index == classStart)
         {
-            for (int j = 1; j <= patternLength; j++)
-            {
-                if (pattern[j - 1] == '*')
-                {
-                    dp[i, j] = dp[i - 1, j] || dp[i, j - 1];
-                }
-                else if (pattern[j - 1] == '?')
-                {
-                    dp[i, j] = dp[i - 1, j - 1];
-                }
-                else
-                {
-                    dp[i, j] = dp[i - 1, j - 1] && text[i - 1] == pattern[j - 1];
-                }
-            }
+            nextIndex = startIndex + 1;
+            matches = false;
+            return false;
         }
 
-        return dp[textLength, patternLength];
+        nextIndex = index + 1;
+        matches = negated ? !found : found;
+        return true;
     }
+
+    private static bool IsInRange(char value, char lower, char upper)
+    {
+        value = char.ToUpperInvariant(value);
+        lower = char.ToUpperInvariant(lower);
+        upper = char.ToUpperInvariant(upper);
+        return value >= lower && value <= upper;
+    }
+
+    private static bool CharsEqual(char left, char right) =>
+        char.ToUpperInvariant(left) == char.ToUpperInvariant(right);
 }

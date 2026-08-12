@@ -11,8 +11,8 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     private readonly ILogger _logger = logger ?? new NullLogger();
 
     // Default patterns to ignore in all directories, common for all platforms
-    private static readonly HashSet<string> _defaultIgnorePatterns = new(StringComparer.OrdinalIgnoreCase)
-    {
+    private static readonly string[] _defaultIgnorePatterns =
+    [
         // Common OS specific files
         ".DS_Store",       // macOS
         "._.DS_Store",     // macOS
@@ -32,7 +32,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
         ".git",
         ".svn",
         ".hg"
-    };
+    ];
+
+    private static readonly GitignoreMatcher _defaultIgnoreMatcher = new(_defaultIgnorePatterns);
 
     /*-----------------------------------------------------------
      * public APIs
@@ -61,14 +63,14 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         // Filter files in the root of the repository
         var ignorePath = Path.Combine(repoRoot, ignoreFileName);
-        var ignorePatterns = LoadIgnoreList(ignorePath);
-        _logger.Verbose($"Loaded {ignorePatterns.Count} user-defined ignore patterns from {ignorePath}");
-        _logger.Verbose($"Using {_defaultIgnorePatterns.Count} default ignore patterns");
+        var ignoreMatcher = LoadIgnoreList(ignorePath);
+        _logger.Verbose($"Loaded {ignoreMatcher.Count} user-defined ignore patterns from {ignorePath}");
+        _logger.Verbose($"Using {_defaultIgnorePatterns.Length} default ignore patterns");
 
         // Process each directory
-        ProcessRepositoryRoot(repoRoot, userHome, ignorePatterns, overwrite, dryRun);
-        ProcessHomeDirectory(repoRoot, userHome, ignorePatterns, overwrite, dryRun);
-        ProcessRootDirectory(repoRoot, ignorePatterns, overwrite, dryRun);
+        ProcessRepositoryRoot(repoRoot, userHome, ignoreMatcher, overwrite, dryRun);
+        ProcessHomeDirectory(repoRoot, userHome, ignoreMatcher, overwrite, dryRun);
+        ProcessRootDirectory(repoRoot, ignoreMatcher, overwrite, dryRun);
 
         if (dryRun)
         {
@@ -88,10 +90,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
-    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
+    /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessRepositoryRoot(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
+    private void ProcessRepositoryRoot(string repoRoot, string userHome, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
     {
         var allFiles = fileSystem.EnumerateFiles(repoRoot, ".*", recursive: false).ToList();
         _logger.Verbose($"Total files in repository root: {allFiles.Count}");
@@ -102,11 +104,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         foreach (var file in allFiles)
         {
-            var fileName = Path.GetFileName(file);
             var relPath = Path.GetRelativePath(repoRoot, file);
-            var isDir = fileSystem.DirectoryExists(file);
 
-            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
+            if (ShouldIgnorePath(relPath, isDirectory: false, ignoreMatcher))
             {
                 ignoredFiles.Add(file);
             }
@@ -141,29 +141,29 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="userHome">The user's home directory path.</param>
-    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
+    /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessHomeDirectory(string repoRoot, string userHome, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
+    private void ProcessHomeDirectory(string repoRoot, string userHome, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
     {
-        ProcessDirectory(repoRoot, "HOME", userHome, ignorePatterns, overwrite, dryRun);
+        ProcessDirectory(repoRoot, "HOME", userHome, ignoreMatcher, overwrite, dryRun);
     }
 
     /// <summary>
     /// Processes and links files in the ROOT directory (Linux/macOS only).
     /// </summary>
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
-    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
+    /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessRootDirectory(string repoRoot, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
+    private void ProcessRootDirectory(string repoRoot, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
         {
             _logger.Info("Skipping ROOT directory processing on non-Unix platforms");
             return;
         }
-        ProcessDirectory(repoRoot, "ROOT", "/", ignorePatterns, overwrite, dryRun);
+        ProcessDirectory(repoRoot, "ROOT", "/", ignoreMatcher, overwrite, dryRun);
     }
 
     /// <summary>
@@ -172,10 +172,10 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     /// <param name="repoRoot">The root directory of the dotfiles repository.</param>
     /// <param name="srcDir">The source directory path.</param>
     /// <param name="destDir">The destination directory path.</param>
-    /// <param name="ignorePatterns">Set of file patterns to ignore.</param>
+    /// <param name="ignoreMatcher">Ordered user-defined ignore rules.</param>
     /// <param name="overwrite">Whether to overwrite existing files.</param>
     /// <param name="dryRun">If true, only shows what would be done without actually creating links.</param>
-    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, HashSet<string> ignorePatterns, bool overwrite, bool dryRun)
+    private void ProcessDirectory(string repoRoot, string srcDir, string destDir, GitignoreMatcher ignoreMatcher, bool overwrite, bool dryRun)
     {
         var srcPath = Path.Combine(repoRoot, srcDir);
         if (!fileSystem.DirectoryExists(srcPath))
@@ -193,11 +193,9 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
 
         foreach (var file in allFiles)
         {
-            var fileName = Path.GetFileName(file);
-            var relPath = Path.GetRelativePath(srcPath, file);
-            var isDir = fileSystem.DirectoryExists(file);
+            var relPath = Path.GetRelativePath(repoRoot, file);
 
-            if (ShouldIgnoreFileEnhanced(relPath, fileName, isDir, ignorePatterns))
+            if (ShouldIgnorePath(relPath, isDirectory: false, ignoreMatcher))
             {
                 ignoredFiles.Add(file);
             }
@@ -326,150 +324,36 @@ public sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger = 
     }
 
     /// <summary>
-    /// Determines whether a file should be ignored based on patterns.
-    /// This is an enhanced version that properly handles negation patterns.
+    /// Determines whether a repository-relative path is ignored by a built-in or user rule.
     /// </summary>
-    /// <param name="filePath">The path to the file (relative to the repository root).</param>
-    /// <param name="fileName">The base name of the file.</param>
-    /// <param name="isDir">Whether the path is a directory.</param>
-    /// <param name="userIgnorePatterns">User-defined patterns to ignore.</param>
-    /// <returns>True if the file should be ignored; otherwise, false.</returns>
-    private bool ShouldIgnoreFileEnhanced(string filePath, string fileName, bool isDir, HashSet<string> userIgnorePatterns)
-    {
-        // Default state: don't ignore
-        bool shouldIgnore = false;
-
-        // Normalize path for cross-platform compatibility
-        filePath = PathUtilities.NormalizePathForPatternMatching(filePath);
-
-        // Check default ignore patterns (exact match)
-        if (_defaultIgnorePatterns.Contains(fileName))
-        {
-            return true; // Always ignore files that match default patterns
-        }
-
-        // Check for wildcards in default ignore patterns
-        foreach (var pattern in _defaultIgnorePatterns)
-        {
-            if (pattern.Contains('*') || pattern.Contains('?'))
-            {
-                // For backward compatibility, we check fileName first
-                if (WildcardMatcher.IsMatch(fileName, pattern))
-                {
-                    return true; // Always ignore files that match default patterns
-                }
-            }
-        }
-
-        // First pass: process non-negation patterns
-        foreach (var pattern in userIgnorePatterns)
-        {
-            // Skip empty patterns and negation patterns for now
-            if (string.IsNullOrEmpty(pattern) || pattern.StartsWith("!"))
-            {
-                continue;
-            }
-            // Normalize pattern for cross-platform compatibility
-            string normalizedPattern = PathUtilities.NormalizePathForPatternMatching(pattern);
-
-            // Check exact match first
-            if (normalizedPattern == fileName)
-            {
-                shouldIgnore = true;
-                continue;
-            }
-
-            // Try with gitignore style matching for path patterns
-            if (normalizedPattern.Contains('/') || normalizedPattern.Contains("**"))
-            {
-                if (GitignoreMatcher.IsMatch(filePath, normalizedPattern, isDir))
-                {
-                    shouldIgnore = true;
-                    continue;
-                }
-            }
-
-            // For simple patterns or backward compatibility, try wildcards
-            if (normalizedPattern.Contains('*') || normalizedPattern.Contains('?'))
-            {
-                if (WildcardMatcher.IsMatch(fileName, normalizedPattern))
-                {
-                    shouldIgnore = true;
-                    continue;
-                }
-            }
-        }
-
-        // Second pass: process negation patterns (these can override ignore decisions)
-        foreach (var pattern in userIgnorePatterns)
-        {
-            // Only process negation patterns
-            if (!pattern.StartsWith("!"))
-            {
-                continue;
-            }
-
-            // Remove the negation prefix for matching
-            string patternWithoutNegation = pattern.Substring(1);
-            // Normalize pattern for cross-platform compatibility
-            patternWithoutNegation = PathUtilities.NormalizePathForPatternMatching(patternWithoutNegation);
-
-            // Check if this negation pattern applies to our file
-            bool matches = false;
-
-            // Try with gitignore style matching for path patterns
-            if (patternWithoutNegation.Contains('/') || patternWithoutNegation.Contains("**"))
-            {
-                matches = GitignoreMatcher.IsMatch(filePath, patternWithoutNegation, isDir);
-            }
-            else if (patternWithoutNegation == fileName)
-            {
-                // Exact match
-                matches = true;
-            }
-            else if (patternWithoutNegation.Contains('*') || patternWithoutNegation.Contains('?'))
-            {
-                // Wildcard match
-                matches = WildcardMatcher.IsMatch(fileName, patternWithoutNegation);
-            }
-
-            // If the negation pattern matches, explicitly don't ignore this file
-            if (matches)
-            {
-                shouldIgnore = false;
-            }
-        }
-
-        return shouldIgnore;
-    }
+    private static bool ShouldIgnorePath(string path, bool isDirectory, GitignoreMatcher userIgnoreMatcher) =>
+        _defaultIgnoreMatcher.IsIgnored(path, isDirectory) ||
+        userIgnoreMatcher.IsIgnored(path, isDirectory);
 
     /// <summary>
     /// Loads the ignore list from the specified file.
     /// </summary>
     /// <param name="ignoreFilePath">The path to the ignore file.</param>
-    /// <returns>A set of file or directory names to ignore.</returns>
-    private HashSet<string> LoadIgnoreList(string ignoreFilePath)
+    /// <returns>An ordered matcher containing the active rules.</returns>
+    private GitignoreMatcher LoadIgnoreList(string ignoreFilePath)
     {
         if (!fileSystem.FileExists(ignoreFilePath))
         {
             _logger.Verbose($"Ignore file not found: {ignoreFilePath}");
-            return new(StringComparer.OrdinalIgnoreCase);
+            return new(Array.Empty<string>());
         }
 
         var lines = fileSystem.ReadAllLines(ignoreFilePath);
         _logger.Verbose($"Loaded {lines.Length} lines from ignore file");
 
-        var ignoreList = lines
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(line => line.Trim())
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var ignoreMatcher = new GitignoreMatcher(lines);
 
         // Debug output for each ignored pattern
-        foreach (var pattern in ignoreList)
+        foreach (var pattern in lines)
         {
             _logger.Verbose($"Ignoring pattern: '{pattern}'");
         }
 
-        return ignoreList;
+        return ignoreMatcher;
     }
 }

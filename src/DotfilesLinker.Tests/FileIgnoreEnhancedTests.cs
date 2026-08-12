@@ -19,9 +19,6 @@ public class FileIgnoreEnhancedTests
     [Fact]
     public void LinkDotfiles_IgnoresDefaultPatterns()
     {
-        // We need to test the private method ShouldIgnoreFileEnhanced
-        // Since it's private, we'll use the public LinkDotfiles method and verify the behavior
-
         // Arrange
         string repoRoot = Path.Combine(Path.DirectorySeparatorChar.ToString(), "repo");
         string userHome = Path.Combine(Path.DirectorySeparatorChar.ToString(), "home");
@@ -98,7 +95,7 @@ public class FileIgnoreEnhancedTests
         _fileSystemMock.FileExists(Path.Combine(repoRoot, ignoreFileName))
             .Returns(true);
         _fileSystemMock.ReadAllLines(Path.Combine(repoRoot, ignoreFileName))
-            .Returns(new[] { "config/settings.json", "log/**" });
+            .Returns(new[] { "HOME/config/settings.json", "HOME/log/**" });
 
         // Mark each file as not a directory
         _fileSystemMock.DirectoryExists(Arg.Any<string>()).Returns(false);
