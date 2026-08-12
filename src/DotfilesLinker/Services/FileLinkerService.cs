@@ -63,6 +63,12 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
             userHome = Path.GetFullPath(userHome);
         }
 
+        if (PathUtilities.IsSameOrDescendant(userHome, repoRoot))
+        {
+            throw new InvalidOperationException(
+                $"User home '{userHome}' must not be the repository root or one of its descendants.");
+        }
+
         if (dryRun)
         {
             _logger.Info("DRY RUN MODE: No files will be actually linked");
@@ -141,6 +147,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         foreach (var src in files)
         {
             var dst = Path.Combine(userHome, Path.GetFileName(src));
+            ValidateLinkPaths(repoRoot, src, dst);
             _logger.Verbose($"Linking {src} to {dst}");
             LinkFile(src, dst, sourceIsDirectory: false, overwrite, dryRun);
         }
@@ -219,6 +226,7 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
         {
             var rel = Path.GetRelativePath(srcPath, entry.Path);
             var dst = Path.Combine(destDir, rel);
+            ValidateLinkPaths(repoRoot, entry.Path, dst);
 
             var dstDir = Path.GetDirectoryName(dst)!;
             _logger.Verbose($"Ensuring directory exists: {dstDir}");
@@ -290,6 +298,21 @@ internal sealed class FileLinkerService(IFileSystem fileSystem, ILogger? logger 
     /// </summary>
     private static string GetRepositoryRelativePath(string repoRoot, string path) =>
         Path.GetRelativePath(repoRoot, path);
+
+    private static void ValidateLinkPaths(string repoRoot, string source, string target)
+    {
+        if (PathUtilities.PathEquals(source, target))
+        {
+            throw new InvalidOperationException(
+                $"Source and destination resolve to the same path: '{source}'.");
+        }
+
+        if (PathUtilities.PathsOverlap(repoRoot, target))
+        {
+            throw new InvalidOperationException(
+                $"Destination '{target}' overlaps dotfiles repository '{repoRoot}'.");
+        }
+    }
 
     /// <summary>
     /// Creates a symbolic link from the source to the target path.

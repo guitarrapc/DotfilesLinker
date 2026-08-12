@@ -60,6 +60,59 @@ public class FileLinkerServiceTests
     }
 
     [Fact]
+    public void LinkDotfiles_ShouldRejectUserHomeInsideRepositoryBeforeProcessing()
+    {
+        var repoRoot = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "overlap", "repo");
+        var userHome = Path.Combine(repoRoot, "home");
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+
+        Assert.Contains("must not be the repository root", exception.Message);
+        _fileSystemMock.DidNotReceive().PathExists(Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().EnumerateFiles(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<bool>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRejectDestinationContainingRepositoryBeforeMutation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "ancestor-overlap");
+        var userHome = root;
+        var repoRoot = Path.Combine(root, ".dotfiles", "repository");
+        var source = Path.Combine(repoRoot, ".dotfiles");
+        var target = Path.Combine(userHome, ".dotfiles");
+
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([source]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+
+        Assert.Contains("overlaps dotfiles repository", exception.Message);
+        _fileSystemMock.DidNotReceive().PathExists(target);
+        _fileSystemMock.DidNotReceive().Move(Arg.Any<string>(), Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LinkDotfiles_ShouldRejectIdenticalSourceAndDestinationBeforeMutation()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "same-path");
+        var repoRoot = Path.Combine(root, "repo");
+        var userHome = Path.Combine(root, "home");
+        var sourceAndTarget = Path.Combine(userHome, ".settings");
+
+        _fileSystemMock.EnumerateFiles(repoRoot, ".*", false).Returns([sourceAndTarget]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            _service.LinkDotfiles(repoRoot, userHome, ".dotfiles_ignore", overwrite: true));
+
+        Assert.Contains("same path", exception.Message);
+        _fileSystemMock.DidNotReceive().PathExists(sourceAndTarget);
+        _fileSystemMock.DidNotReceive().Move(Arg.Any<string>(), Arg.Any<string>());
+        _fileSystemMock.DidNotReceive().CreateFileSymlink(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
     public void LinkDotfiles_ShouldSkipIgnoredFiles()
     {
         // Arrange
@@ -158,11 +211,15 @@ public class FileLinkerServiceTests
     {
         // Arrange
         string repoRoot = Path.Combine(Path.GetTempPath(), "repo");
-        string userHome = "/home/user";
+        string userHome = Path.Combine(Path.GetTempPath(), "home", "user");
         string homeRoot = Path.Combine(repoRoot, "HOME");
         bool overwrite = false;
 
-        var filesInHome = new[] { "/repo/HOME/.config/file1", "/repo/HOME/.config/file2" };
+        var filesInHome = new[]
+        {
+            Path.Combine(homeRoot, ".config", "file1"),
+            Path.Combine(homeRoot, ".config", "file2")
+        };
         _fileSystemMock.DirectoryExists(homeRoot).Returns(true);
         _fileSystemMock.EnumerateFiles(homeRoot, "*", false).Returns(filesInHome);
         _fileSystemMock.FileExists(Arg.Any<string>()).Returns(false);

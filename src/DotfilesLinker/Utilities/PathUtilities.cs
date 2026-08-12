@@ -23,6 +23,33 @@ internal static class PathUtilities
     }
 
     /// <summary>
+    /// Determines whether two paths are equal or one contains the other.
+    /// </summary>
+    public static bool PathsOverlap(string first, string second) =>
+        IsSameOrDescendant(first, second) || IsSameOrDescendant(second, first);
+
+    /// <summary>
+    /// Determines whether <paramref name="path"/> is equal to or below <paramref name="directory"/>.
+    /// </summary>
+    public static bool IsSameOrDescendant(string path, string directory)
+    {
+        if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(directory))
+        {
+            return false;
+        }
+
+        var relativePath = Path.GetRelativePath(
+            Path.GetFullPath(directory),
+            Path.GetFullPath(path));
+
+        return relativePath == "." ||
+            (!Path.IsPathRooted(relativePath) &&
+             relativePath != ".." &&
+             !relativePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal) &&
+             !relativePath.StartsWith($"..{Path.AltDirectorySeparatorChar}", StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// Determines whether a symbolic link target resolves to an expected path.
     /// </summary>
     /// <param name="linkPath">The path of the symbolic link.</param>

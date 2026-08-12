@@ -4,6 +4,39 @@ namespace DotfilesLinker.Tests;
 
 public class PathUtilitiesTests
 {
+    [Theory]
+    [InlineData("same", "same", true)]
+    [InlineData("parent/child", "parent", true)]
+    [InlineData("parent/child/grandchild", "parent", true)]
+    [InlineData("parent", "parent/child", false)]
+    [InlineData("parent-sibling", "parent", false)]
+    public void IsSameOrDescendant_DetectsPathContainment(
+        string path,
+        string directory,
+        bool expected)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "containment");
+
+        Assert.Equal(
+            expected,
+            PathUtilities.IsSameOrDescendant(
+                Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)),
+                Path.Combine(root, directory.Replace('/', Path.DirectorySeparatorChar))));
+    }
+
+    [Fact]
+    public void PathsOverlap_IsSymmetric()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "DotfilesLinker", "overlap");
+        var parent = Path.Combine(root, "parent");
+        var child = Path.Combine(parent, "child");
+        var sibling = Path.Combine(root, "sibling");
+
+        Assert.True(PathUtilities.PathsOverlap(parent, child));
+        Assert.True(PathUtilities.PathsOverlap(child, parent));
+        Assert.False(PathUtilities.PathsOverlap(parent, sibling));
+    }
+
     [Fact]
     public void LinkTargetEquals_ResolvesRelativeTargetFromLinkDirectory()
     {
