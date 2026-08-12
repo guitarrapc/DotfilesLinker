@@ -346,25 +346,27 @@ The following files and directories are automatically excluded:
 
 ## Security
 
-All release artifacts are digitally signed using [Cosign](https://github.com/sigstore/cosign) to ensure their integrity and authenticity. This helps prevent security warnings from antivirus software like Windows Defender.
+Release archives have signed GitHub artifact attestations for both build provenance and their associated SBOM. The attestations use short-lived Sigstore certificates issued through GitHub Actions, so no long-lived signing key is required.
 
-### Verifying Signatures
+### Verifying Attestations
 
-You can verify the signatures using the [Cosign CLI](https://github.com/sigstore/cosign#installation):
+Use the [GitHub CLI](https://cli.github.com/) to verify that an archive was produced by this repository's release workflow:
 
 ```bash
-# Download the public key (only needed once)
-curl -O https://raw.githubusercontent.com/guitarrapc/DotfilesLinker/main/cosign.pub
+# Verify build provenance
+gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker
 
-# Verify an artifact (replace with the artifact you downloaded)
-cosign verify-blob --key cosign.pub --signature DotfilesLinker_win_amd64.zip.sig DotfilesLinker_win_amd64.zip
+# Verify the SPDX SBOM attestation
+gh attestation verify DotfilesLinker_win_amd64.zip \
+  --repo guitarrapc/DotfilesLinker \
+  --predicate-type https://spdx.dev/Document/v2.2
 ```
 
-A successful verification confirms the file was released officially and has not been tampered with.
+A successful verification confirms that the archive matches an attestation signed by this repository's GitHub Actions workflow.
 
 Each release also includes:
-- SBOM (Software Bill of Materials) files in SPDX format
-- SHA256 checksums for all artifacts
+- An SPDX JSON SBOM for each release archive
+- SHA256 checksums for all release archives and SBOM files
 
 ## License
 

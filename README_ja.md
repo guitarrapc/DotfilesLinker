@@ -347,25 +347,27 @@ Gitとの差異・未対応の挙動：
 
 ## セキュリティ
 
-すべてのリリースアーティファクトは、整合性と信頼性を確保するために[Cosign](https://github.com/sigstore/cosign)を使用してデジタル署名されています。これにより、Windows Defenderなどのウイルス対策ソフトウェアからのセキュリティ警告を防止できます。
+リリースアーカイブには、ビルド来歴と対応するSBOMの両方について、署名済みのGitHub Artifact Attestationが付与されます。AttestationはGitHub Actionsが発行する短命のSigstore証明書を使用するため、長期間有効な署名鍵は不要です。
 
-### 署名の検証
+### Attestationの検証
 
-[Cosign CLI](https://github.com/sigstore/cosign#installation)を使用して署名を検証できます：
+[GitHub CLI](https://cli.github.com/)を使用して、アーカイブがこのリポジトリのリリースワークフローで生成されたことを検証できます：
 
 ```bash
-# 公開鍵をダウンロード（初回のみ必要）
-curl -O https://raw.githubusercontent.com/guitarrapc/DotfilesLinker/main/cosign.pub
+# ビルド来歴を検証
+gh attestation verify DotfilesLinker_win_amd64.zip --repo guitarrapc/DotfilesLinker
 
-# アーティファクトを検証（ダウンロードしたアーティファクトに合わせて変更）
-cosign verify-blob --key cosign.pub --signature DotfilesLinker_win_amd64.zip.sig DotfilesLinker_win_amd64.zip
+# SPDX SBOM Attestationを検証
+gh attestation verify DotfilesLinker_win_amd64.zip \
+  --repo guitarrapc/DotfilesLinker \
+  --predicate-type https://spdx.dev/Document/v2.2
 ```
 
-検証が成功すれば、そのファイルが公式にリリースされ、改ざんされていないことが確認できます。
+検証が成功すれば、アーカイブがこのリポジトリのGitHub Actionsワークフローによって署名されたAttestationと一致することを確認できます。
 
 各リリースには以下も含まれています：
-- SBOM（ソフトウェア部品表）ファイル（SPDX形式）
-- すべてのアーティファクトのSHA256チェックサム
+- リリースアーカイブごとのSPDX JSON形式のSBOM（ソフトウェア部品表）
+- すべてのリリースアーカイブとSBOMファイルのSHA256チェックサム
 
 ## ライセンス
 
