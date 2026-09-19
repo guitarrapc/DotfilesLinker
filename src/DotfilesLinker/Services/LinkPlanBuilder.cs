@@ -35,14 +35,15 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
         bool overwrite)
     {
         var ignorePath = Path.Combine(repoRoot, ignoreFileName);
-        var ignoreMatcher = LoadIgnoreList(ignorePath);
+        var ignoreMatcher = LoadPatterns(ignorePath);
+        var directoryLinks = LoadPatterns(Path.Combine(repoRoot, "dotfiles_link_dirs"), "directory-link");
         logger.Log(LogLevel.Verbose, $"Loaded {ignoreMatcher.Count} user-defined ignore patterns from {ignorePath}");
         logger.Log(LogLevel.Verbose, $"Using {_defaultIgnorePatterns.Length} default ignore patterns");
 
         var operations = new List<LinkOperation>();
         CollectRepositoryRootOperations(repoRoot, userHome, ignoreMatcher, operations);
-        CollectDirectoryOperations(repoRoot, "HOME", userHome, ignoreMatcher, operations);
-        CollectRootOperations(repoRoot, ignoreMatcher, operations);
+        CollectDirectoryOperations(repoRoot, "HOME", userHome, ignoreMatcher, directoryLinks, operations);
+        CollectRootOperations(repoRoot, ignoreMatcher, directoryLinks, operations);
 
         return ValidateLinkPlan(repoRoot, operations, overwrite);
     }
@@ -84,6 +85,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
     private void CollectRootOperations(
         string repoRoot,
         GitignoreMatcher ignoreMatcher,
+        GitignoreMatcher directoryLinks,
         List<LinkOperation> operations)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
@@ -92,7 +94,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
             return;
         }
 
-        CollectDirectoryOperations(repoRoot, "ROOT", "/", ignoreMatcher, operations);
+        CollectDirectoryOperations(repoRoot, "ROOT", "/", ignoreMatcher, directoryLinks, operations);
     }
 
     private void CollectDirectoryOperations(
@@ -100,6 +102,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
         string sourceDirectory,
         string destinationDirectory,
         GitignoreMatcher ignoreMatcher,
+        GitignoreMatcher directoryLinks,
         List<LinkOperation> operations)
     {
         var sourcePath = Path.Combine(repoRoot, sourceDirectory);
@@ -121,6 +124,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
             sourcePath,
             destinationDirectory,
             ignoreMatcher,
+            directoryLinks,
             operations,
             ignoredPaths);
 
@@ -141,6 +145,7 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
         string sourceRoot,
         string destinationRoot,
         GitignoreMatcher ignoreMatcher,
+        GitignoreMatcher directoryLinks,
         List<LinkOperation> operations,
         List<string> ignoredPaths)
     {
@@ -157,7 +162,8 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
                 {
                     ignoredPaths.Add(directory);
                 }
-                else if (fileSystem.IsSymbolicLink(directory))
+                // A selected directory is one operation; never traverse its contents.
+                else if (directoryLinks.IsIgnored(relativePath, isDirectory: true) || fileSystem.IsSymbolicLink(directory))
                 {
                     AddOperation(directory, sourceIsDirectory: true);
                 }
@@ -265,34 +271,34 @@ internal sealed class LinkPlanBuilder(IFileSystem fileSystem, ILogger logger)
         _defaultIgnoreMatcher.IsIgnored(path, isDirectory) ||
         userIgnoreMatcher.IsIgnored(path, isDirectory);
 
-    private GitignoreMatcher LoadIgnoreList(string ignoreFilePath)
+    private GitignoreMatcher LoadPatterns(string ignoreFilePath, string kind = "ignore")
     {
         try
         {
             if (!fileSystem.PathExists(ignoreFilePath))
             {
-                logger.Log(LogLevel.Verbose, $"Ignore file not found: {ignoreFilePath}");
+                logger.Log(LogLevel.Verbose, $"Optional {kind} file not found: {ignoreFilePath}");
                 return new(Array.Empty<string>());
             }
 
             var lines = fileSystem.ReadAllLines(ignoreFilePath);
-            logger.Log(LogLevel.Verbose, $"Loaded {lines.Length} lines from ignore file");
+            logger.Log(LogLevel.Verbose, $"Loaded {lines.Length} lines from {kind} file");
             var ignoreMatcher = new GitignoreMatcher(lines);
 
             foreach (var pattern in lines)
             {
-                logger.Log(LogLevel.Verbose, $"Ignoring pattern: '{pattern}'");
+                logger.Log(LogLevel.Verbose, $"Loaded {kind} pattern: '{pattern}'");
             }
 
             return ignoreMatcher;
         }
         catch (UnauthorizedAccessException ex)
         {
-            throw new UnauthorizedAccessException($"Failed to load ignore file '{ignoreFilePath}'.", ex);
+            throw new UnauthorizedAccessException($"Failed to load {kind} file '{ignoreFilePath}'.", ex);
         }
         catch (IOException ex)
         {
-            throw new IOException($"Failed to load ignore file '{ignoreFilePath}'.", ex);
+            throw new IOException($"Failed to load {kind} file '{ignoreFilePath}'.", ex);
         }
     }
 }
