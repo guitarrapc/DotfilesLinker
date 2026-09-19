@@ -271,7 +271,7 @@ dotfileslinker --root /path/to/dotfiles --dry-run --force
 dotfileslinker --root /path/to/dotfiles --force
 ```
 
-`--dry-run` はファイルシステムを変更せず、作成するフォルダーリンクを表示します。C# 版と Go 版で共通の設定形式です。
+`--dry-run` はファイルシステムを変更せず、作成するフォルダーリンクを表示します。
 
 ### dotfiles_ignore ファイル
 
