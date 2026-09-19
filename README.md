@@ -269,7 +269,7 @@ dotfileslinker --root /path/to/dotfiles --dry-run --force
 dotfileslinker --root /path/to/dotfiles --force
 ```
 
-`--dry-run` reports directory symlinks without changing the filesystem. Both the C# and Go implementations use this configuration format.
+`--dry-run` reports directory symlinks without changing the filesystem.
 
 ### dotfiles_ignore File
 
