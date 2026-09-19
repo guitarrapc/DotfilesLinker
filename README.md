@@ -243,6 +243,34 @@ The command-line option takes precedence over the environment variable:
 DotfilesLinker --root /path/to/my/dotfiles
 ```
 
+### Directory Links (`dotfiles_link_dirs`)
+
+By default, directories are traversed and their files are linked individually. To link selected directories as a whole, create `dotfiles_link_dirs` in the repository root:
+
+```gitignore
+# Link each Codex skill directory, keeping SKILL.md as a regular file
+HOME/.agents/skills/*
+
+# Link a complete application configuration directory
+HOME/.config/nvim
+```
+
+Patterns use the same gitignore-style syntax as `dotfiles_ignore`, including comments, wildcards, trailing `/`, and `!` exclusions, but a positive match **selects a directory for linking**. Paths are repository-relative and include `HOME/` or `ROOT/`. Only directories beneath those containers are eligible; files, repository-root dotfiles, and the `HOME`/`ROOT` containers themselves keep their existing behavior. `ROOT` is processed only on Linux/macOS.
+
+- Each selected directory becomes one symlink at the corresponding destination. Its contents are not traversed; empty directories work too, and new source files appear through the link immediately.
+- Default exclusions and `dotfiles_ignore` take precedence when evaluating the directory and its ancestors. Once a directory is selected, its **entire contents** are exposed through the link: ignore rules and directory-link exclusions for descendants cannot filter those contents. For selective contents, leave the parent unselected and select individual child directories instead.
+- A missing or empty `dotfiles_link_dirs` preserves the default file-by-file behavior. The configuration file is not linked to the home directory.
+- An existing link to the same directory is skipped. Converting an existing real directory (including one containing file symlinks) requires `--force`. As with other forced replacements, the old destination and its contents are removed after the new link is created; preserve any local-only files first.
+
+Preview the migration, then apply it:
+
+```shell
+dotfileslinker --root /path/to/dotfiles --dry-run --force
+dotfileslinker --root /path/to/dotfiles --force
+```
+
+`--dry-run` reports directory symlinks without changing the filesystem. Both the C# and Go implementations use this configuration format.
+
 ### dotfiles_ignore File
 
 You can specify files or directories to be excluded from linking in the `dotfiles_ignore` file. Rules use gitignore-style syntax and paths are relative to the dotfiles repository root.
