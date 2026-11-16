@@ -42,8 +42,7 @@ jobs:
         run: dotnet build -c Release --no-restore
       - name: Test
         shell: bash
-        run: dotnet test -c Release --no-build --logger GitHubActions --logger "console;verbosity=normal"
-      # output to ./src/DotfilesLinker/artifacts/publish/DotfilesLinker/release_${{ matrix.rid }}/*
+        run: dotnet test -c Release --no-build
       - name: Publish
         shell: bash
         run: dotnet publish ./src/DotfilesLinker/ -c Release -r ${{ matrix.rid }} --artifacts-path ./artifacts
